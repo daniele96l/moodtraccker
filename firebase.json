@@ -1,0 +1,28 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Mood Tracker",
+        "supportEmail": "daniele96ligato@gmail.com",
+        "authorizedRedirectUris": [
+          "http://localhost",
+          "https://moodtraccker.vercel.app",
+          "https://progetto3-7e3ca.firebaseapp.com",
+          "https://progetto3-7e3ca.web.app"
+        ],
+        "authorizedDomains": [
+          "localhost",
+          "127.0.0.1",
+          "moodtraccker.vercel.app",
+          "backtesto-team.vercel.app",
+          "progetto3-7e3ca.firebaseapp.com",
+          "progetto3-7e3ca.web.app"
+        ]
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getDayEntry, subscribeStore, upsertDayEntry } from "@/lib/local-store";
+import { getDayEntry, subscribeStore, upsertDayEntry } from "@/lib/firestore-store";
 import type { DayEntry } from "@/lib/types";
 
 export function useDayEntry(dateKey: string) {
@@ -20,8 +20,7 @@ export function useDayEntry(dateKey: string) {
 
   const upsert = useCallback(
     (patch: Partial<Pick<DayEntry, "mood_score" | "journal_text">>) => {
-      const updated = upsertDayEntry(dateKey, patch);
-      setEntry(updated);
+      void upsertDayEntry(dateKey, patch).then(setEntry);
     },
     [dateKey]
   );

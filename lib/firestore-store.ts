@@ -1,0 +1,483 @@
+"use client";
+
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  setDoc,
+  writeBatch,
+  type DocumentData,
+} from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase";
+import {
+  packDayEntry,
+  packHabit,
+  packHabitLog,
+  packMeditationSession,
+  unpackDayEntry,
+  unpackHabit,
+  unpackHabitLog,
+  unpackMeditationSession,
+} from "@/lib/firestore-crypto";
+import type {
+  DayEntry,
+  Habit,
+  HabitKind,
+  HabitLog,
+  MeditationSession,
+} from "@/lib/types";
+import type { MoodStore } from "@/lib/local-store";
+
+const CHANGE_EVENT = "moodtracker:change";
+
+let currentUid: string | null = null;
+let cache: MoodStore = emptyCache();
+let snapshotsReady = false;
+const listeners = new Set<() => void>();
+let snapshotUnsubs: (() => void)[] = [];
+
+function emptyCache(): MoodStore {
+  return {
+    day_entries: [],
+    habits: [],
+    habit_logs: [],
+    meditation_sessions: [],
+  };
+}
+
+function notify() {
+  listeners.forEach((l) => l());
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  }
+}
+
+function requireUid(): string {
+  if (!currentUid) throw new Error("Not authenticated");
+  return currentUid;
+}
+
+export function isStoreReady() {
+  return snapshotsReady;
+}
+
+export function setStoreUser(uid: string | null) {
+  snapshotUnsubs.forEach((u) => u());
+  snapshotUnsubs = [];
+  currentUid = uid;
+  cache = emptyCache();
+  snapshotsReady = false;
+
+  if (!uid) return;
+
+  const db = getFirebaseDb();
+  const base = ["users", uid] as const;
+  let received = 0;
+  const markReady = () => {
+    received += 1;
+    if (received >= 4) {
+      snapshotsReady = true;
+      notify();
+    }
+  };
+
+  snapshotUnsubs.push(
+    onSnapshot(collection(db, ...base, "day_entries"), (snap) => {
+      void (async () => {
+        cache.day_entries = await Promise.all(
+          snap.docs.map((d) => unpackDayEntry(d.id, d.data()))
+        );
+        markReady();
+        notify();
+      })();
+    })
+  );
+
+  snapshotUnsubs.push(
+    onSnapshot(collection(db, ...base, "habits"), (snap) => {
+      void (async () => {
+        cache.habits = await Promise.all(
+          snap.docs.map((d) => unpackHabit(d.id, d.data()))
+        );
+        markReady();
+        notify();
+      })();
+    })
+  );
+
+  snapshotUnsubs.push(
+    onSnapshot(collection(db, ...base, "habit_logs"), (snap) => {
+      void (async () => {
+        cache.habit_logs = await Promise.all(
+          snap.docs.map((d) => unpackHabitLog(d.id, d.data()))
+        );
+        markReady();
+        notify();
+      })();
+    })
+  );
+
+  snapshotUnsubs.push(
+    onSnapshot(collection(db, ...base, "meditation_sessions"), (snap) => {
+      void (async () => {
+        cache.meditation_sessions = await Promise.all(
+          snap.docs.map((d) => unpackMeditationSession(d.id, d.data()))
+        );
+        markReady();
+        notify();
+      })();
+    })
+  );
+}
+
+export function subscribeStore(listener: () => void) {
+  listeners.add(listener);
+  if (typeof window !== "undefined") {
+    window.addEventListener(CHANGE_EVENT, listener);
+  }
+  return () => {
+    listeners.delete(listener);
+    if (typeof window !== "undefined") {
+      window.removeEventListener(CHANGE_EVENT, listener);
+    }
+  };
+}
+
+export function getDayEntry(dateKey: string): DayEntry | null {
+  return cache.day_entries.find((e) => e.entry_date === dateKey) ?? null;
+}
+
+export async function upsertDayEntry(
+  dateKey: string,
+  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text">>
+): Promise<DayEntry> {
+  const uid = requireUid();
+  const now = new Date().toISOString();
+  const existing = getDayEntry(dateKey);
+  const entry: DayEntry = {
+    id: dateKey,
+    entry_date: dateKey,
+    mood_score:
+      patch.mood_score !== undefined
+        ? patch.mood_score
+        : (existing?.mood_score ?? null),
+    journal_text:
+      patch.journal_text !== undefined
+        ? patch.journal_text
+        : (existing?.journal_text ?? null),
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
+  };
+
+  if (existing) {
+    const idx = cache.day_entries.findIndex((e) => e.entry_date === dateKey);
+    if (idx >= 0) cache.day_entries[idx] = entry;
+  } else {
+    cache.day_entries.push(entry);
+  }
+  notify();
+
+  await setDoc(
+    doc(getFirebaseDb(), "users", uid, "day_entries", dateKey),
+    await packDayEntry(entry)
+  );
+
+  return entry;
+}
+
+export function getMonthMoods(
+  year: number,
+  month: number
+): Record<string, number | null> {
+  const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  const map: Record<string, number | null> = {};
+  cache.day_entries.forEach((e) => {
+    if (e.entry_date >= start && e.entry_date <= end) {
+      map[e.entry_date] = e.mood_score;
+    }
+  });
+  return map;
+}
+
+export function getMonthMeditationDays(
+  year: number,
+  month: number
+): Record<string, boolean> {
+  const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  const map: Record<string, boolean> = {};
+  cache.meditation_sessions.forEach((s) => {
+    if (s.session_date >= start && s.session_date <= end) {
+      map[s.session_date] = true;
+    }
+  });
+  return map;
+}
+
+export function getHabits(): Habit[] {
+  return cache.habits
+    .filter((h) => !h.archived_at)
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+export function getHabitLogsForDate(dateKey: string): Record<string, boolean> {
+  const habitIds = new Set(cache.habits.map((h) => h.id));
+  const map: Record<string, boolean> = {};
+  cache.habit_logs.forEach((log) => {
+    if (log.log_date === dateKey && habitIds.has(log.habit_id)) {
+      map[log.habit_id] = log.completed;
+    }
+  });
+  return map;
+}
+
+export async function addHabit(name: string, kind: HabitKind): Promise<Habit> {
+  const uid = requireUid();
+  const habit: Habit = {
+    id: crypto.randomUUID(),
+    name,
+    kind,
+    color: null,
+    sort_order: cache.habits.length,
+    archived_at: null,
+    created_at: new Date().toISOString(),
+  };
+
+  cache.habits.push(habit);
+  notify();
+
+  await setDoc(
+    doc(getFirebaseDb(), "users", uid, "habits", habit.id),
+    await packHabit(habit)
+  );
+
+  return habit;
+}
+
+async function persistHabitLog(log: HabitLog) {
+  const uid = requireUid();
+  const logId = `${log.habit_id}_${log.log_date}`;
+  await setDoc(
+    doc(getFirebaseDb(), "users", uid, "habit_logs", logId),
+    await packHabitLog(log)
+  );
+}
+
+export async function toggleHabitLog(
+  habitId: string,
+  dateKey: string
+): Promise<boolean> {
+  const habit = cache.habits.find((h) => h.id === habitId);
+  if (!habit) return false;
+
+  const idx = cache.habit_logs.findIndex(
+    (l) => l.habit_id === habitId && l.log_date === dateKey
+  );
+
+  let nextCompleted: boolean;
+  let log: HabitLog;
+
+  if (habit.kind === "vice") {
+    nextCompleted = idx < 0 ? true : !cache.habit_logs[idx].completed;
+    if (idx >= 0) {
+      cache.habit_logs[idx].completed = nextCompleted;
+      log = cache.habit_logs[idx];
+    } else {
+      log = {
+        id: crypto.randomUUID(),
+        habit_id: habitId,
+        log_date: dateKey,
+        completed: true,
+      };
+      cache.habit_logs.push(log);
+    }
+  } else if (idx >= 0) {
+    cache.habit_logs[idx].completed = !cache.habit_logs[idx].completed;
+    nextCompleted = cache.habit_logs[idx].completed;
+    log = cache.habit_logs[idx];
+  } else {
+    log = {
+      id: crypto.randomUUID(),
+      habit_id: habitId,
+      log_date: dateKey,
+      completed: true,
+    };
+    cache.habit_logs.push(log);
+    nextCompleted = true;
+  }
+
+  notify();
+  await persistHabitLog(log);
+  return nextCompleted;
+}
+
+export async function setHabitLog(
+  habitId: string,
+  dateKey: string,
+  completed: boolean
+) {
+  const idx = cache.habit_logs.findIndex(
+    (l) => l.habit_id === habitId && l.log_date === dateKey
+  );
+
+  let log: HabitLog;
+  if (idx >= 0) {
+    cache.habit_logs[idx].completed = completed;
+    log = cache.habit_logs[idx];
+  } else {
+    log = {
+      id: crypto.randomUUID(),
+      habit_id: habitId,
+      log_date: dateKey,
+      completed,
+    };
+    cache.habit_logs.push(log);
+  }
+
+  notify();
+  await persistHabitLog(log);
+}
+
+export async function bulkSetHabits(
+  dateKey: string,
+  kind: HabitKind,
+  completed: boolean
+) {
+  const targets = cache.habits.filter(
+    (h) => !h.archived_at && h.kind === kind
+  );
+
+  for (const habit of targets) {
+    await setHabitLog(habit.id, dateKey, completed);
+  }
+}
+
+export async function archiveHabit(habitId: string) {
+  const uid = requireUid();
+  const habit = cache.habits.find((h) => h.id === habitId);
+  if (!habit) return;
+
+  habit.archived_at = new Date().toISOString();
+  notify();
+
+  await setDoc(
+    doc(getFirebaseDb(), "users", uid, "habits", habitId),
+    await packHabit(habit)
+  );
+}
+
+export function getHabitLogs(habitId: string) {
+  return cache.habit_logs.filter((l) => l.habit_id === habitId);
+}
+
+export function getMeditationSessions(dateKey: string): MeditationSession[] {
+  return cache.meditation_sessions
+    .filter((s) => s.session_date === dateKey)
+    .sort(
+      (a, b) =>
+        new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+    );
+}
+
+export async function addMeditationSession(
+  dateKey: string,
+  durationSeconds: number,
+  pattern: string | null
+): Promise<MeditationSession> {
+  const uid = requireUid();
+  const session: MeditationSession = {
+    id: crypto.randomUUID(),
+    session_date: dateKey,
+    duration_seconds: durationSeconds,
+    pattern,
+    completed_at: new Date().toISOString(),
+  };
+
+  cache.meditation_sessions.push(session);
+  notify();
+
+  await setDoc(
+    doc(getFirebaseDb(), "users", uid, "meditation_sessions", session.id),
+    await packMeditationSession(session)
+  );
+
+  return session;
+}
+
+export async function getMigrationStatus(): Promise<{
+  migrated: boolean;
+  hasCloudData: boolean;
+}> {
+  const uid = requireUid();
+  const meta = await getDoc(
+    doc(getFirebaseDb(), "users", uid, "meta", "settings")
+  );
+  const migrated = meta.exists() && !!meta.data()?.localMigratedAt;
+
+  const hasCloudData =
+    cache.day_entries.length > 0 ||
+    cache.habits.length > 0 ||
+    cache.habit_logs.length > 0 ||
+    cache.meditation_sessions.length > 0;
+
+  return { migrated, hasCloudData };
+}
+
+export async function markMigrationComplete(imported: boolean) {
+  const uid = requireUid();
+  await setDoc(doc(getFirebaseDb(), "users", uid, "meta", "settings"), {
+    localMigratedAt: new Date().toISOString(),
+    importedLocalData: imported,
+  });
+}
+
+export async function importLocalStore(store: MoodStore) {
+  const uid = requireUid();
+  const db = getFirebaseDb();
+  const ops: Array<{
+    ref: ReturnType<typeof doc>;
+    data: DocumentData;
+  }> = [];
+
+  for (const entry of store.day_entries) {
+    ops.push({
+      ref: doc(db, "users", uid, "day_entries", entry.entry_date),
+      data: await packDayEntry(entry),
+    });
+  }
+
+  for (const habit of store.habits) {
+    ops.push({
+      ref: doc(db, "users", uid, "habits", habit.id),
+      data: await packHabit(habit),
+    });
+  }
+
+  for (const log of store.habit_logs) {
+    ops.push({
+      ref: doc(db, "users", uid, "habit_logs", `${log.habit_id}_${log.log_date}`),
+      data: await packHabitLog(log),
+    });
+  }
+
+  for (const session of store.meditation_sessions) {
+    ops.push({
+      ref: doc(db, "users", uid, "meditation_sessions", session.id),
+      data: await packMeditationSession(session),
+    });
+  }
+
+  for (let i = 0; i < ops.length; i += 450) {
+    const batch = writeBatch(db);
+    ops.slice(i, i + 450).forEach(({ ref, data }) => batch.set(ref, data));
+    await batch.commit();
+  }
+
+  await markMigrationComplete(true);
+}

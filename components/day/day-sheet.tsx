@@ -19,7 +19,7 @@ import { moodColor } from "@/lib/mood-colors";
 import {
   getMeditationSessions,
   subscribeStore,
-} from "@/lib/local-store";
+} from "@/lib/firestore-store";
 import type { MeditationSession } from "@/lib/types";
 import type { DayTab } from "@/lib/types";
 

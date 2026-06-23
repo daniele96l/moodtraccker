@@ -9,7 +9,7 @@ import {
   getHabits,
   subscribeStore,
   toggleHabitLog,
-} from "@/lib/local-store";
+} from "@/lib/firestore-store";
 import type { Habit, HabitKind } from "@/lib/types";
 
 export function useHabits(dateKey: string) {

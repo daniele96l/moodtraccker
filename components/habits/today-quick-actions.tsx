@@ -8,7 +8,7 @@ import {
   getDayEntry,
   getMeditationSessions,
   subscribeStore,
-} from "@/lib/local-store";
+} from "@/lib/firestore-store";
 import type { DayTab } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { toDateKey } from "@/lib/date-utils";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getMonthMeditationDays, getMonthMoods, subscribeStore } from "@/lib/local-store";
+import { getMonthMeditationDays, getMonthMoods, subscribeStore } from "@/lib/firestore-store";
 
 export function useMonthMoods(year: number, month: number, refreshKey = 0) {
   const [moods, setMoods] = useState<Record<string, number | null>>({});

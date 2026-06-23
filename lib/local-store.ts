@@ -25,7 +25,7 @@ function emptyStore(): MoodStore {
   };
 }
 
-function loadRaw(): MoodStore {
+export function loadRaw(): MoodStore {
   if (typeof window === "undefined") return emptyStore();
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyStore();

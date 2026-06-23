@@ -9,6 +9,7 @@ import { formatMonthLabel, toDateKey } from "@/lib/date-utils";
 import type { DayTab } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/lib/auth-context";
 
 interface MonthBlockProps {
   year: number;
@@ -67,6 +68,7 @@ function buildMonthList(centerYear: number, centerMonth: number, count: number) 
 }
 
 export function InfiniteCalendar() {
+  const { signOut } = useAuth();
   const now = new Date();
   const [months, setMonths] = useState(() =>
     buildMonthList(now.getFullYear(), now.getMonth(), 5)
@@ -217,6 +219,15 @@ export function InfiniteCalendar() {
               Today
             </Button>
             <ThemeToggle />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-full px-2 text-[11px] text-muted-foreground"
+              onClick={() => void signOut()}
+            >
+              Sign out
+            </Button>
           </div>
           <p className="mt-0.5 text-center text-xs text-muted-foreground">
             Tap a day · scroll for more months

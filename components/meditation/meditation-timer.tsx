@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { BreathingCircle } from "@/components/meditation/breathing-circle";
-import { addMeditationSession } from "@/lib/local-store";
+import { addMeditationSession } from "@/lib/firestore-store";
 import {
   isBreathSoundsEnabled,
   playBreathCue,

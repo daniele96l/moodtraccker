@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getHabitLogs } from "@/lib/local-store";
+import { getHabitLogs } from "@/lib/firestore-store";
 import {
   getHabitStreak,
   habitDisplayLabel,

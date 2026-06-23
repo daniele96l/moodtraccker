@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
-import { PinGate } from "@/components/auth/pin-gate";
+import { AuthProvider } from "@/lib/auth-context";
+import { EncryptionProvider } from "@/lib/encryption-context";
+import { AuthGate } from "@/components/auth/auth-gate";
+import { EncryptionGate } from "@/components/auth/encryption-gate";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -33,7 +36,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full font-sans text-foreground">
-        <PinGate>{children}</PinGate>
+        <AuthProvider>
+          <EncryptionProvider>
+            <AuthGate>
+              <EncryptionGate>{children}</EncryptionGate>
+            </AuthGate>
+          </EncryptionProvider>
+        </AuthProvider>
       </body>
     </html>
   );
