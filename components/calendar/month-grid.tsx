@@ -23,7 +23,7 @@ interface MonthGridProps {
   onDayClick: (dateKey: string) => void;
 }
 
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const WEEK_OPTS = { weekStartsOn: 1 as const };
 
 export function MonthGrid({
@@ -43,11 +43,11 @@ export function MonthGrid({
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="mb-2 grid grid-cols-7 justify-items-center gap-1">
-        {WEEKDAYS.map((d, i) => (
+      <div className="mb-2 grid grid-cols-7 gap-1">
+        {WEEKDAYS.map((d) => (
           <div
-            key={`${d}-${i}`}
-            className="flex h-5 w-10 items-center justify-center text-[10px] font-medium text-muted-foreground"
+            key={d}
+            className="text-center text-[10px] font-medium text-muted-foreground"
           >
             {d}
           </div>
@@ -69,7 +69,7 @@ export function MonthGrid({
               disabled={!inMonth}
               onClick={() => inMonth && onDayClick(dateKey)}
               className={cn(
-                "relative flex aspect-square w-10 items-center justify-center rounded-md transition-transform active:scale-95",
+                "relative flex aspect-square w-full max-w-[40px] items-center justify-center rounded-md transition-transform active:scale-95",
                 isToday && "scroll-mt-32",
                 !inMonth && "invisible pointer-events-none",
                 inMonth && "cursor-pointer hover:ring-2 hover:ring-primary/25 hover:shadow-sm",

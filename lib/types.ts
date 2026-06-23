@@ -1,4 +1,4 @@
-export type DayTab = "mood" | "journal" | "habits" | "meditate";
+export type DayTab = "mood" | "journal" | "habits" | "meditate" | "calendar";
 
 export interface DayTodo {
   id: string;

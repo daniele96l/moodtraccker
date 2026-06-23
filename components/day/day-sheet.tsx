@@ -13,7 +13,9 @@ import { MoodSlider } from "@/components/day/mood-slider";
 import { JournalEditor } from "@/components/day/journal-editor";
 import { HabitList } from "@/components/day/habit-list";
 import { MeditationTimer } from "@/components/meditation/meditation-timer";
+import { DayPlan } from "@/components/day/day-plan";
 import { useDayEntry } from "@/lib/hooks/use-day-entry";
+import { useDayTodos } from "@/lib/hooks/use-day-todos";
 import { useHabits } from "@/lib/hooks/use-habits";
 import { moodColor } from "@/lib/mood-colors";
 import { useTheme } from "@/lib/hooks/use-theme";
@@ -34,6 +36,14 @@ interface DaySheetProps {
 export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: DaySheetProps) {
   const isDark = useTheme() === "dark";
   const { entry, loading, upsert } = useDayEntry(dateKey);
+  const {
+    todos,
+    loading: calendarLoading,
+    addTodo,
+    toggleTodo,
+    removeTodo,
+    updateTodo,
+  } = useDayTodos(dateKey);
   const {
     habits,
     logs,
@@ -113,30 +123,36 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
             </div>
           ) : (
             <Tabs value={tab} onValueChange={(v) => setTab(v as DayTab)} className="flex min-h-0 flex-col">
-              <TabsList className="mb-4 grid h-9 w-full shrink-0 grid-cols-4 rounded-full bg-muted/60 p-0.5">
+              <TabsList className="mb-4 grid h-9 w-full shrink-0 grid-cols-5 rounded-full bg-muted/60 p-0.5">
                 <TabsTrigger
                   value="mood"
-                  className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
+                  className="rounded-full px-1 text-[10px] data-active:bg-background data-active:shadow-sm sm:text-xs"
                 >
                   Mood
                 </TabsTrigger>
                 <TabsTrigger
                   value="journal"
-                  className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
+                  className="rounded-full px-1 text-[10px] data-active:bg-background data-active:shadow-sm sm:text-xs"
                 >
                   Journal
                 </TabsTrigger>
                 <TabsTrigger
                   value="habits"
-                  className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
+                  className="rounded-full px-1 text-[10px] data-active:bg-background data-active:shadow-sm sm:text-xs"
                 >
                   Habits
                 </TabsTrigger>
                 <TabsTrigger
                   value="meditate"
-                  className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
+                  className="rounded-full px-1 text-[10px] data-active:bg-background data-active:shadow-sm sm:text-xs"
                 >
                   Meditate
+                </TabsTrigger>
+                <TabsTrigger
+                  value="calendar"
+                  className="rounded-full px-1 text-[10px] data-active:bg-background data-active:shadow-sm sm:text-xs"
+                >
+                  Calendar
                 </TabsTrigger>
               </TabsList>
 
@@ -190,6 +206,17 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
                     ))}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="calendar" className="mt-0 outline-none">
+                <DayPlan
+                  todos={todos}
+                  loading={calendarLoading}
+                  onAdd={addTodo}
+                  onToggle={toggleTodo}
+                  onRemove={removeTodo}
+                  onUpdate={updateTodo}
+                />
               </TabsContent>
             </Tabs>
           )}
