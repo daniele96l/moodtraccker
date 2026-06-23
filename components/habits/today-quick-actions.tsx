@@ -1,16 +1,37 @@
 "use client";
 
-import { Check, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BookOpen, Check, Flower2, ShieldCheck } from "lucide-react";
 import { useHabits } from "@/lib/hooks/use-habits";
 import { habitDisplayLabel } from "@/lib/habit-utils";
+import {
+  getDayEntry,
+  getMeditationSessions,
+  subscribeStore,
+} from "@/lib/local-store";
+import type { DayTab } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { toDateKey } from "@/lib/date-utils";
 
-export function TodayQuickActions() {
+interface TodayQuickActionsProps {
+  onOpenDay: (tab: DayTab) => void;
+}
+
+export function TodayQuickActions({ onOpenDay }: TodayQuickActionsProps) {
   const today = toDateKey(new Date());
   const { habits, logs, loading, toggleHabit } = useHabits(today);
+  const [hasJournal, setHasJournal] = useState(false);
+  const [meditationCount, setMeditationCount] = useState(0);
 
-  if (loading || habits.length === 0) return null;
+  useEffect(() => {
+    const refresh = () => {
+      const entry = getDayEntry(today);
+      setHasJournal(!!entry?.journal_text?.trim());
+      setMeditationCount(getMeditationSessions(today).length);
+    };
+    refresh();
+    return subscribeStore(refresh);
+  }, [today]);
 
   const habitItems = habits.filter((h) => h.kind === "habit");
   const viceItems = habits.filter((h) => h.kind === "vice");
@@ -30,10 +51,10 @@ export function TodayQuickActions() {
           "shrink-0 rounded-full border px-3 py-1.5 text-left transition-all active:scale-95",
           success
             ? kind === "habit"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-sky-200 bg-sky-50 text-sky-800"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+              : "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
             : completed === false && kind === "vice"
-              ? "border-rose-200 bg-rose-50/80 text-rose-700"
+              ? "border-rose-200 bg-rose-50/80 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
               : "border-border/60 bg-card/90 text-muted-foreground hover:border-primary/30"
         )}
       >
@@ -53,13 +74,54 @@ export function TodayQuickActions() {
   };
 
   return (
-    <div className="mt-4 space-y-2 border-t border-border/40 pt-4">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-lg -translate-x-1/2 border-t border-border/40 bg-background/90 px-5 py-3 backdrop-blur-xl">
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Today — quick tap
       </p>
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {habitItems.map((h) => renderChip(h.id, h.name, "habit"))}
-        {viceItems.map((h) => renderChip(h.id, h.name, "vice"))}
+      <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          type="button"
+          onClick={() => onOpenDay("meditate")}
+          className={cn(
+            "shrink-0 rounded-full border px-3 py-1.5 text-left transition-all active:scale-95",
+            meditationCount > 0
+              ? "border-primary/30 bg-primary/10 text-foreground"
+              : "border-border/60 bg-card/90 text-muted-foreground hover:border-primary/30"
+          )}
+        >
+          <span className="flex items-center gap-1.5 text-xs font-medium">
+            {meditationCount > 0 && <Flower2 className="h-3 w-3 text-primary" />}
+            Meditate
+          </span>
+          <span className="block text-[10px] opacity-70">
+            {meditationCount > 0
+              ? `${meditationCount} session${meditationCount > 1 ? "s" : ""}`
+              : "Start today"}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onOpenDay("journal")}
+          className={cn(
+            "shrink-0 rounded-full border px-3 py-1.5 text-left transition-all active:scale-95",
+            hasJournal
+              ? "border-primary/30 bg-primary/10 text-foreground"
+              : "border-border/60 bg-card/90 text-muted-foreground hover:border-primary/30"
+          )}
+        >
+          <span className="flex items-center gap-1.5 text-xs font-medium">
+            {hasJournal && <BookOpen className="h-3 w-3 text-primary" />}
+            Journal
+          </span>
+          <span className="block text-[10px] opacity-70">
+            {hasJournal ? "Entry saved" : "Write today"}
+          </span>
+        </button>
+
+        {!loading &&
+          habitItems.map((h) => renderChip(h.id, h.name, "habit"))}
+        {!loading && viceItems.map((h) => renderChip(h.id, h.name, "vice"))}
       </div>
     </div>
   );

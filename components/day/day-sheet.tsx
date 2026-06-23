@@ -21,14 +21,16 @@ import {
   subscribeStore,
 } from "@/lib/local-store";
 import type { MeditationSession } from "@/lib/types";
+import type { DayTab } from "@/lib/types";
 
 interface DaySheetProps {
   dateKey: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: DayTab;
 }
 
-export function DaySheet({ dateKey, open, onOpenChange }: DaySheetProps) {
+export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: DaySheetProps) {
   const { entry, loading, upsert } = useDayEntry(dateKey);
   const {
     habits,
@@ -42,6 +44,11 @@ export function DaySheet({ dateKey, open, onOpenChange }: DaySheetProps) {
   } = useHabits(dateKey);
   const [mood, setMood] = useState(5);
   const [sessions, setSessions] = useState<MeditationSession[]>([]);
+  const [tab, setTab] = useState<DayTab>(initialTab);
+
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab, dateKey]);
 
   const parsed = parseISO(dateKey);
   const title = format(parsed, "EEEE, MMMM d");
@@ -103,7 +110,7 @@ export function DaySheet({ dateKey, open, onOpenChange }: DaySheetProps) {
               <div className="h-6 w-6 animate-pulse rounded-full bg-primary/15" />
             </div>
           ) : (
-            <Tabs defaultValue="mood" className="flex min-h-0 flex-col">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as DayTab)} className="flex min-h-0 flex-col">
               <TabsList className="mb-4 grid h-9 w-full shrink-0 grid-cols-4 rounded-full bg-muted/60 p-0.5">
                 <TabsTrigger
                   value="mood"

@@ -5,36 +5,38 @@ import { MonthGrid } from "@/components/calendar/month-grid";
 import { DaySheet } from "@/components/day/day-sheet";
 import { TodayQuickActions } from "@/components/habits/today-quick-actions";
 import { useMonthMoods } from "@/lib/hooks/use-month-moods";
-import { formatMonthLabel } from "@/lib/date-utils";
+import { formatMonthLabel, toDateKey } from "@/lib/date-utils";
+import type { DayTab } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface MonthBlockProps {
   year: number;
   month: number;
   refreshKey: number;
   onDayClick: (dateKey: string) => void;
-  onVisible?: () => void;
 }
 
-function MonthBlock({ year, month, refreshKey, onDayClick, onVisible }: MonthBlockProps) {
+function MonthBlock({ year, month, refreshKey, onDayClick }: MonthBlockProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const { moods, loading } = useMonthMoods(year, month, refreshKey);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !onVisible) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) onVisible();
-      },
-      { threshold: 0.3 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [onVisible]);
+  const { moods, meditatedDays, loading } = useMonthMoods(year, month, refreshKey);
+  const now = new Date();
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth();
 
   return (
-    <div ref={ref} className="scroll-mt-4 px-4 py-5">
-      <h2 className="mb-3 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/80">
+    <div
+      ref={ref}
+      id={isCurrentMonth ? "month-current" : `month-${year}-${month}`}
+      data-month-block
+      data-year={year}
+      data-month={month}
+      className="scroll-mt-4 px-4 py-5"
+    >
+      <h2
+        className="sticky z-[9] -mx-4 mb-3 border-b border-border/40 bg-background/90 px-4 py-2.5 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground backdrop-blur-md"
+        style={{ top: "var(--calendar-header-offset, 8.5rem)" }}
+      >
         {formatMonthLabel(year, month)}
       </h2>
       {loading ? (
@@ -46,6 +48,7 @@ function MonthBlock({ year, month, refreshKey, onDayClick, onVisible }: MonthBlo
           year={year}
           month={month}
           moods={moods}
+          meditatedDays={meditatedDays}
           onDayClick={onDayClick}
         />
       )}
@@ -70,10 +73,63 @@ export function InfiniteCalendar() {
   );
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [initialTab, setInitialTab] = useState<DayTab>("mood");
   const [refreshKey, setRefreshKey] = useState(0);
+  const headerRef = useRef<HTMLElement>(null);
   const topSentinel = useRef<HTMLDivElement>(null);
   const bottomSentinel = useRef<HTMLDivElement>(null);
   const loadingMore = useRef(false);
+  const hasScrolledToToday = useRef(false);
+
+  const scrollToToday = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const todayEl = document.getElementById("calendar-today");
+    if (todayEl) {
+      todayEl.scrollIntoView({ block: "center", behavior });
+      return true;
+    }
+    const monthEl = document.getElementById("month-current");
+    if (monthEl) {
+      monthEl.scrollIntoView({ block: "start", behavior });
+      return true;
+    }
+    return false;
+  }, []);
+
+  useEffect(() => {
+    if (hasScrolledToToday.current) return;
+
+    const tryScroll = () => {
+      if (scrollToToday("instant")) {
+        hasScrolledToToday.current = true;
+      }
+    };
+
+    tryScroll();
+    const t1 = window.setTimeout(tryScroll, 100);
+    const t2 = window.setTimeout(tryScroll, 400);
+
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [scrollToToday]);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+
+    const syncOffset = () => {
+      document.documentElement.style.setProperty(
+        "--calendar-header-offset",
+        `${el.offsetHeight}px`
+      );
+    };
+
+    syncOffset();
+    const observer = new ResizeObserver(syncOffset);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const loadPast = useCallback(() => {
     if (loadingMore.current) return;
@@ -130,18 +186,38 @@ export function InfiniteCalendar() {
     };
   }, [loadPast, loadFuture]);
 
-  const handleDayClick = (dateKey: string) => {
+  const openDaySheet = (dateKey: string, tab: DayTab = "mood") => {
     setSelectedDate(dateKey);
+    setInitialTab(tab);
     setSheetOpen(true);
+  };
+
+  const handleDayClick = (dateKey: string) => {
+    openDaySheet(dateKey, "mood");
   };
 
   return (
     <>
-      <div className="mx-auto w-full max-w-lg">
-        <header className="sticky top-0 z-10 border-b border-border/40 bg-background/75 px-5 py-5 backdrop-blur-xl">
-          <h1 className="text-center text-xl font-medium tracking-tight text-foreground">
-            Mood
-          </h1>
+      <div className="mx-auto w-full max-w-lg pb-28">
+        <header
+          ref={headerRef}
+          className="sticky top-0 z-10 border-b border-border/40 bg-background/75 px-5 py-5 backdrop-blur-xl"
+        >
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-center text-xl font-medium tracking-tight text-foreground">
+              Mood
+            </h1>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-full px-3 text-[11px]"
+              onClick={() => scrollToToday("smooth")}
+            >
+              Today
+            </Button>
+            <ThemeToggle />
+          </div>
           <p className="mt-0.5 text-center text-xs text-muted-foreground">
             Tap a day · scroll for more months
           </p>
@@ -166,7 +242,6 @@ export function InfiniteCalendar() {
               />
             ))}
           </div>
-          <TodayQuickActions />
         </header>
 
         <div ref={topSentinel} className="h-1" />
@@ -184,10 +259,13 @@ export function InfiniteCalendar() {
         <div ref={bottomSentinel} className="h-1" />
       </div>
 
+      <TodayQuickActions onOpenDay={(tab) => openDaySheet(toDateKey(new Date()), tab)} />
+
       {selectedDate && (
         <DaySheet
           dateKey={selectedDate}
           open={sheetOpen}
+          initialTab={initialTab}
           onOpenChange={(open) => {
             setSheetOpen(open);
             if (!open) setRefreshKey((k) => k + 1);

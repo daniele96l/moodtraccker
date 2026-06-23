@@ -103,6 +103,23 @@ export function getMonthMoods(
   return map;
 }
 
+export function getMonthMeditationDays(
+  year: number,
+  month: number
+): Record<string, boolean> {
+  const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  const map: Record<string, boolean> = {};
+  loadRaw().meditation_sessions.forEach((s) => {
+    if (s.session_date >= start && s.session_date <= end) {
+      map[s.session_date] = true;
+    }
+  });
+  return map;
+}
+
 export function getHabits(): Habit[] {
   return loadRaw().habits
     .filter((h) => !h.archived_at)

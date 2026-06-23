@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getMonthMoods, subscribeStore } from "@/lib/local-store";
+import { getMonthMeditationDays, getMonthMoods, subscribeStore } from "@/lib/local-store";
 
 export function useMonthMoods(year: number, month: number, refreshKey = 0) {
   const [moods, setMoods] = useState<Record<string, number | null>>({});
+  const [meditatedDays, setMeditatedDays] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   const fetchMoods = useCallback(() => {
     setMoods(getMonthMoods(year, month));
+    setMeditatedDays(getMonthMeditationDays(year, month));
     setLoading(false);
   }, [year, month]);
 
@@ -17,5 +19,5 @@ export function useMonthMoods(year: number, month: number, refreshKey = 0) {
     return subscribeStore(fetchMoods);
   }, [fetchMoods, refreshKey]);
 
-  return { moods, loading, refetch: fetchMoods };
+  return { moods, meditatedDays, loading, refetch: fetchMoods };
 }

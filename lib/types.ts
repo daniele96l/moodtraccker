@@ -1,3 +1,5 @@
+export type DayTab = "mood" | "journal" | "habits" | "meditate";
+
 export type HabitKind = "habit" | "vice";
 
 export type MeditationPattern = "box" | "478" | "silent";

@@ -13,13 +13,25 @@ export const metadata: Metadata = {
   description: "Track your mood, habits, journal, and meditation",
 };
 
+const themeScript = `
+(function () {
+  try {
+    var t = localStorage.getItem("moodtracker-theme");
+    if (t === "dark") document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} h-full antialiased`}>
+    <html lang="en" className={`${dmSans.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full font-sans text-foreground">
         <PinGate>{children}</PinGate>
       </body>

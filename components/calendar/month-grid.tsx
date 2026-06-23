@@ -10,6 +10,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import { Flower2 } from "lucide-react";
 import { moodColor } from "@/lib/mood-colors";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +18,19 @@ interface MonthGridProps {
   year: number;
   month: number;
   moods: Record<string, number | null>;
+  meditatedDays: Record<string, boolean>;
   onDayClick: (dateKey: string) => void;
 }
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-export function MonthGrid({ year, month, moods, onDayClick }: MonthGridProps) {
+export function MonthGrid({
+  year,
+  month,
+  moods,
+  meditatedDays,
+  onDayClick,
+}: MonthGridProps) {
   const monthStart = startOfMonth(new Date(year, month, 1));
   const monthEnd = endOfMonth(monthStart);
   const gridStart = startOfWeek(monthStart);
@@ -48,22 +56,46 @@ export function MonthGrid({ year, month, moods, onDayClick }: MonthGridProps) {
           const inMonth = isSameMonth(day, monthStart);
           const score = moods[dateKey] ?? null;
           const isToday = isSameDay(day, today);
+          const meditated = meditatedDays[dateKey];
 
           return (
             <button
               key={dateKey}
+              id={isToday ? "calendar-today" : undefined}
               type="button"
               disabled={!inMonth}
               onClick={() => inMonth && onDayClick(dateKey)}
               className={cn(
-                "aspect-square w-full max-w-[40px] rounded-md transition-transform active:scale-95",
+                "relative flex aspect-square w-full max-w-[40px] items-center justify-center rounded-md transition-transform active:scale-95",
+                isToday && "scroll-mt-32",
                 !inMonth && "invisible pointer-events-none",
                 inMonth && "cursor-pointer hover:ring-2 hover:ring-primary/25 hover:shadow-sm",
-                isToday && "ring-2 ring-primary/50 ring-offset-2 ring-offset-background shadow-sm"
+                isToday && "font-semibold ring-2 ring-primary/50 ring-offset-2 ring-offset-background shadow-sm"
               )}
               style={{ backgroundColor: moodColor(score) }}
-              aria-label={format(day, "MMMM d, yyyy")}
-            />
+              aria-label={
+                meditated
+                  ? `${format(day, "MMMM d, yyyy")} — meditated`
+                  : format(day, "MMMM d, yyyy")
+              }
+            >
+              <span
+                className={cn(
+                  "text-[11px] tabular-nums text-foreground/70",
+                  isToday && "text-foreground"
+                )}
+              >
+                {format(day, "d")}
+              </span>
+              {meditated && inMonth && (
+                <span
+                  className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/85 shadow-sm ring-1 ring-primary/15 dark:bg-black/50 dark:ring-primary/25"
+                  title="Meditated"
+                >
+                  <Flower2 className="h-2 w-2 text-primary/75" strokeWidth={2.5} />
+                </span>
+              )}
+            </button>
           );
         })}
       </div>
