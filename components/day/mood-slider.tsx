@@ -1,7 +1,8 @@
 "use client";
 
-import { MOOD_EMOJIS, MOOD_LABELS } from "@/lib/mood-colors";
+import { moodColor, MOOD_LABELS } from "@/lib/mood-colors";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 
 interface MoodSliderProps {
   value: number;
@@ -10,28 +11,53 @@ interface MoodSliderProps {
 
 export function MoodSlider({ value, onChange }: MoodSliderProps) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-center gap-2">
-        <span className="text-3xl">{MOOD_EMOJIS[value]}</span>
-        <div className="text-center">
-          <p className="text-2xl font-medium">{value}</p>
-          <p className="text-xs text-muted-foreground">{MOOD_LABELS[value]}</p>
+    <div className="space-y-6 py-2">
+      <div className="flex flex-col items-center">
+        <div
+          className="flex h-20 w-20 items-center justify-center rounded-full shadow-inner transition-colors duration-300"
+          style={{ backgroundColor: moodColor(value) }}
+        >
+          <span className="text-3xl font-light tabular-nums text-foreground/75">
+            {value}
+          </span>
+        </div>
+        <p className="mt-4 text-sm font-medium tracking-wide text-foreground/80">
+          {MOOD_LABELS[value]}
+        </p>
+      </div>
+
+      <div className="space-y-3 px-1">
+        <Slider
+          min={1}
+          max={10}
+          step={1}
+          value={[value]}
+          onValueChange={(vals) => {
+            const next = Array.isArray(vals) ? vals[0] : vals;
+            if (typeof next === "number") onChange(next);
+          }}
+          className="py-1"
+        />
+        <div className="flex justify-between px-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+          <span>Low</span>
+          <span>High</span>
         </div>
       </div>
-      <Slider
-        min={1}
-        max={10}
-        step={1}
-        value={[value]}
-        onValueChange={(vals) => {
-          const next = Array.isArray(vals) ? vals[0] : vals;
-          if (typeof next === "number") onChange(next);
-        }}
-        className="py-2"
-      />
-      <div className="flex justify-between text-[10px] text-muted-foreground">
-        <span>Low</span>
-        <span>High</span>
+
+      <div className="flex justify-between gap-1 px-0.5">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            className={cn(
+              "h-2 flex-1 rounded-full transition-all",
+              n === value ? "scale-110 ring-2 ring-primary/30 ring-offset-1" : "opacity-60 hover:opacity-100"
+            )}
+            style={{ backgroundColor: moodColor(n) }}
+            aria-label={`Mood ${n}`}
+          />
+        ))}
       </div>
     </div>
   );

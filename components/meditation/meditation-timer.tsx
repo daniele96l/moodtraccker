@@ -1,10 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pause, Play, Square } from "lucide-react";
+import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { BreathingCircle } from "@/components/meditation/breathing-circle";
 import { addMeditationSession } from "@/lib/local-store";
+import {
+  isBreathSoundsEnabled,
+  playBreathCue,
+  setBreathSoundsEnabled,
+} from "@/lib/breathing-sounds";
 import type { MeditationPattern } from "@/lib/types";
 
 const PRESETS = [3, 5, 10, 15];
@@ -27,12 +34,29 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
   const [pattern, setPattern] = useState<MeditationPattern>("box");
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [soundsOn, setSoundsOn] = useState(true);
   const [totalSecondsLeft, setTotalSecondsLeft] = useState(5 * 60);
   const [phase, setPhase] = useState<Phase>("idle");
   const [phaseSecondsLeft, setPhaseSecondsLeft] = useState(0);
   const stepIndex = useRef(0);
   const elapsed = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevPhase = useRef<Phase>("idle");
+
+  useEffect(() => {
+    setSoundsOn(isBreathSoundsEnabled());
+  }, []);
+
+  useEffect(() => {
+    if (phase === prevPhase.current || phase === "idle") {
+      prevPhase.current = phase;
+      return;
+    }
+    if (running && !paused) {
+      playBreathCue(phase);
+    }
+    prevPhase.current = phase;
+  }, [phase, running, paused]);
 
   const getPatternSteps = useCallback(() => {
     return PATTERNS.find((p) => p.id === pattern)?.steps ?? [];
@@ -46,12 +70,14 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
     setTotalSecondsLeft(durationMin * 60);
     stepIndex.current = 0;
     elapsed.current = 0;
+    prevPhase.current = "idle";
   }, [durationMin]);
 
   const saveSession = useCallback(
     (seconds: number) => {
       if (seconds < 10) return;
       addMeditationSession(dateKey, seconds, pattern);
+      playBreathCue("end");
       onComplete?.();
     },
     [dateKey, pattern, onComplete]
@@ -63,6 +89,7 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
     stepIndex.current = 0;
     setRunning(true);
     setPaused(false);
+    playBreathCue("start");
 
     const steps = getPatternSteps();
     if (steps.length > 0) {
@@ -73,10 +100,10 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
     }
   };
 
-  const stop = async () => {
+  const stop = () => {
     const seconds = elapsed.current;
     reset();
-    await saveSession(seconds);
+    saveSession(seconds);
   };
 
   useEffect(() => {
@@ -130,15 +157,45 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
+  const toggleSounds = (on: boolean) => {
+    setSoundsOn(on);
+    setBreathSoundsEnabled(on);
+    if (on) playBreathCue("start");
+  };
+
   return (
-    <div className="space-y-5 rounded-xl border border-violet-100 bg-white/60 p-4">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-5 rounded-2xl border border-border/50 bg-card/80 p-4 shadow-sm">
+      <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2">
+        <div className="flex items-center gap-2">
+          {soundsOn ? (
+            <Volume2 className="h-4 w-4 text-primary/70" />
+          ) : (
+            <VolumeX className="h-4 w-4 text-muted-foreground" />
+          )}
+          <Label htmlFor="breath-sounds" className="text-xs text-muted-foreground">
+            Breath sounds
+          </Label>
+        </div>
+        <Switch
+          id="breath-sounds"
+          checked={soundsOn}
+          onCheckedChange={toggleSounds}
+          disabled={running}
+        />
+      </div>
+
+      <p className="text-center text-[11px] text-muted-foreground">
+        Soft tones cue each phase — no need to watch the screen
+      </p>
+
+      <div className="flex flex-wrap justify-center gap-2">
         {PRESETS.map((m) => (
           <Button
             key={m}
             type="button"
             size="sm"
             variant={durationMin === m ? "default" : "outline"}
+            className="h-8 rounded-full px-3"
             disabled={running}
             onClick={() => setDurationMin(m)}
           >
@@ -147,13 +204,14 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {PATTERNS.map((p) => (
           <Button
             key={p.id}
             type="button"
             size="sm"
             variant={pattern === p.id ? "default" : "outline"}
+            className="h-8 rounded-full px-3"
             disabled={running}
             onClick={() => setPattern(p.id)}
           >
@@ -168,13 +226,13 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
         secondsLeft={phaseSecondsLeft}
       />
 
-      <p className="text-center text-2xl font-light tabular-nums text-violet-800/80">
+      <p className="text-center text-3xl font-light tabular-nums tracking-tight text-primary/80">
         {formatTime(totalSecondsLeft)}
       </p>
 
       <div className="flex justify-center gap-2">
         {!running ? (
-          <Button type="button" onClick={start}>
+          <Button type="button" className="rounded-full px-6" onClick={start}>
             <Play className="mr-1 h-4 w-4" />
             Start
           </Button>
@@ -183,6 +241,7 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
             <Button
               type="button"
               variant="outline"
+              className="rounded-full"
               onClick={() => setPaused((p) => !p)}
             >
               {paused ? (
@@ -197,7 +256,12 @@ export function MeditationTimer({ dateKey, onComplete }: MeditationTimerProps) {
                 </>
               )}
             </Button>
-            <Button type="button" variant="secondary" onClick={stop}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="rounded-full"
+              onClick={stop}
+            >
               <Square className="mr-1 h-4 w-4" />
               Finish
             </Button>

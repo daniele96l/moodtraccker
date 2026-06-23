@@ -58,8 +58,8 @@ export function MonthGrid({ year, month, moods, onDayClick }: MonthGridProps) {
               className={cn(
                 "aspect-square w-full max-w-[40px] rounded-md transition-transform active:scale-95",
                 !inMonth && "invisible pointer-events-none",
-                inMonth && "cursor-pointer hover:ring-2 hover:ring-violet-200",
-                isToday && "ring-2 ring-violet-400 ring-offset-1"
+                inMonth && "cursor-pointer hover:ring-2 hover:ring-primary/25 hover:shadow-sm",
+                isToday && "ring-2 ring-primary/50 ring-offset-2 ring-offset-background shadow-sm"
               )}
               style={{ backgroundColor: moodColor(score) }}
               aria-label={format(day, "MMMM d, yyyy")}

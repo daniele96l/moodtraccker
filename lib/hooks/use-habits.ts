@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   addHabit as addHabitToStore,
+  archiveHabit as archiveHabitInStore,
+  bulkSetHabits,
   getHabitLogsForDate,
   getHabits,
   subscribeStore,
@@ -37,5 +39,27 @@ export function useHabits(dateKey: string) {
     [dateKey]
   );
 
-  return { habits, logs, loading, addHabit, toggleHabit, refetch: fetchAll };
+  const markAllHabitsDone = useCallback(() => {
+    bulkSetHabits(dateKey, "habit", true);
+  }, [dateKey]);
+
+  const markAllVicesAvoided = useCallback(() => {
+    bulkSetHabits(dateKey, "vice", true);
+  }, [dateKey]);
+
+  const archiveHabit = useCallback((habitId: string) => {
+    archiveHabitInStore(habitId);
+  }, []);
+
+  return {
+    habits,
+    logs,
+    loading,
+    addHabit,
+    toggleHabit,
+    markAllHabitsDone,
+    markAllVicesAvoided,
+    archiveHabit,
+    refetch: fetchAll,
+  };
 }

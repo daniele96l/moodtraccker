@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MonthGrid } from "@/components/calendar/month-grid";
 import { DaySheet } from "@/components/day/day-sheet";
+import { TodayQuickActions } from "@/components/habits/today-quick-actions";
 import { useMonthMoods } from "@/lib/hooks/use-month-moods";
 import { formatMonthLabel } from "@/lib/date-utils";
 
@@ -32,13 +33,13 @@ function MonthBlock({ year, month, refreshKey, onDayClick, onVisible }: MonthBlo
   }, [onVisible]);
 
   return (
-    <div ref={ref} className="scroll-mt-4 px-4 py-6">
-      <h2 className="mb-4 text-center text-sm font-medium text-muted-foreground">
+    <div ref={ref} className="scroll-mt-4 px-4 py-5">
+      <h2 className="mb-3 text-center text-xs font-medium uppercase tracking-widest text-muted-foreground/80">
         {formatMonthLabel(year, month)}
       </h2>
       {loading ? (
-        <div className="flex h-48 items-center justify-center">
-          <div className="h-6 w-6 animate-pulse rounded-full bg-violet-100" />
+        <div className="flex h-44 items-center justify-center">
+          <div className="h-6 w-6 animate-pulse rounded-full bg-primary/15" />
         </div>
       ) : (
         <MonthGrid
@@ -137,18 +138,18 @@ export function InfiniteCalendar() {
   return (
     <>
       <div className="mx-auto w-full max-w-lg">
-        <header className="sticky top-0 z-10 border-b border-violet-100/60 bg-[#faf8ff]/90 px-4 py-4 backdrop-blur-sm">
-          <h1 className="text-center text-lg font-medium text-foreground">
-            Your mood calendar
+        <header className="sticky top-0 z-10 border-b border-border/40 bg-background/75 px-5 py-5 backdrop-blur-xl">
+          <h1 className="text-center text-xl font-medium tracking-tight text-foreground">
+            Mood
           </h1>
-          <p className="mt-1 text-center text-xs text-muted-foreground">
-            Tap a day to record mood, journal, and habits
+          <p className="mt-0.5 text-center text-xs text-muted-foreground">
+            Tap a day · scroll for more months
           </p>
-          <div className="mt-3 flex items-center justify-center gap-1">
+          <div className="mt-3 flex items-center justify-center gap-1.5">
             {[1, 3, 5, 7, 10].map((s) => (
               <div
                 key={s}
-                className="h-3 w-3 rounded-sm"
+                className="h-2.5 w-2.5 rounded-md shadow-sm"
                 style={{
                   backgroundColor:
                     s === 1
@@ -165,6 +166,7 @@ export function InfiniteCalendar() {
               />
             ))}
           </div>
+          <TodayQuickActions />
         </header>
 
         <div ref={topSentinel} className="h-1" />

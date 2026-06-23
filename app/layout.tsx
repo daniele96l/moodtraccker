@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${dmSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-[#faf8ff] font-sans text-foreground">
+      <body className="min-h-full font-sans text-foreground">
         <PinGate>{children}</PinGate>
       </body>
     </html>

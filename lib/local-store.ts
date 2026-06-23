@@ -142,9 +142,29 @@ export function toggleHabitLog(
   dateKey: string
 ): boolean {
   const store = loadRaw();
+  const habit = store.habits.find((h) => h.id === habitId);
+  if (!habit) return false;
+
   const idx = store.habit_logs.findIndex(
     (l) => l.habit_id === habitId && l.log_date === dateKey
   );
+
+  if (habit.kind === "vice") {
+    const next =
+      idx < 0 ? true : !store.habit_logs[idx].completed;
+    if (idx >= 0) {
+      store.habit_logs[idx].completed = next;
+    } else {
+      store.habit_logs.push({
+        id: crypto.randomUUID(),
+        habit_id: habitId,
+        log_date: dateKey,
+        completed: true,
+      });
+    }
+    saveRaw(store);
+    return idx < 0 ? true : next;
+  }
 
   if (idx >= 0) {
     store.habit_logs[idx].completed = !store.habit_logs[idx].completed;
@@ -161,6 +181,68 @@ export function toggleHabitLog(
   store.habit_logs.push(log);
   saveRaw(store);
   return true;
+}
+
+export function setHabitLog(
+  habitId: string,
+  dateKey: string,
+  completed: boolean
+) {
+  const store = loadRaw();
+  const idx = store.habit_logs.findIndex(
+    (l) => l.habit_id === habitId && l.log_date === dateKey
+  );
+  if (idx >= 0) {
+    store.habit_logs[idx].completed = completed;
+  } else {
+    store.habit_logs.push({
+      id: crypto.randomUUID(),
+      habit_id: habitId,
+      log_date: dateKey,
+      completed,
+    });
+  }
+  saveRaw(store);
+}
+
+export function bulkSetHabits(
+  dateKey: string,
+  kind: HabitKind,
+  completed: boolean
+) {
+  const store = loadRaw();
+  const targets = store.habits.filter(
+    (h) => !h.archived_at && h.kind === kind
+  );
+  targets.forEach((habit) => {
+    const idx = store.habit_logs.findIndex(
+      (l) => l.habit_id === habit.id && l.log_date === dateKey
+    );
+    if (idx >= 0) {
+      store.habit_logs[idx].completed = completed;
+    } else {
+      store.habit_logs.push({
+        id: crypto.randomUUID(),
+        habit_id: habit.id,
+        log_date: dateKey,
+        completed,
+      });
+    }
+  });
+  saveRaw(store);
+}
+
+export function archiveHabit(habitId: string) {
+  const store = loadRaw();
+  const habit = store.habits.find((h) => h.id === habitId);
+  if (habit) {
+    habit.archived_at = new Date().toISOString();
+    saveRaw(store);
+  }
+}
+
+export function getHabitLogs(habitId: string) {
+  return loadRaw().habit_logs.filter((l) => l.habit_id === habitId);
 }
 
 export function getMeditationSessions(dateKey: string): MeditationSession[] {

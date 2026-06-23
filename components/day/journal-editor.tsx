@@ -27,7 +27,7 @@ export function JournalEditor({ value, onSave }: JournalEditorProps) {
       value={text}
       onChange={(e) => handleChange(e.target.value)}
       placeholder="How was your day? Write freely…"
-      className="min-h-[120px] resize-none border-violet-100 bg-white/60 text-sm"
+      className="min-h-[140px] resize-none rounded-2xl border-border/50 bg-muted/30 text-sm shadow-none focus-visible:ring-primary/20"
     />
   );
 }

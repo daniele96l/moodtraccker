@@ -62,7 +62,7 @@ export function PinGate({ children }: { children: React.ReactNode }) {
 
   if (mode === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#faf8ff]">
+      <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
@@ -73,8 +73,8 @@ export function PinGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#faf8ff] p-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white/80 p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="w-full max-w-sm rounded-3xl border border-border/50 bg-card/90 p-8 shadow-lg shadow-primary/5 backdrop-blur-sm">
         <h1 className="mb-1 text-center text-xl font-medium text-foreground">
           Mood Tracker
         </h1>

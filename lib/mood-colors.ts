@@ -30,16 +30,3 @@ export const MOOD_LABELS: Record<number, string> = {
   9: "Happy",
   10: "Amazing",
 };
-
-export const MOOD_EMOJIS: Record<number, string> = {
-  1: "😞",
-  2: "😔",
-  3: "😕",
-  4: "😐",
-  5: "😶",
-  6: "🙂",
-  7: "😊",
-  8: "😄",
-  9: "😁",
-  10: "🤩",
-};
