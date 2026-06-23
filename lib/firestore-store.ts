@@ -12,16 +12,21 @@ import {
 import { getFirebaseDb } from "@/lib/firebase";
 import {
   packDayEntry,
+  packGlobalInbox,
   packHabit,
   packHabitLog,
   packMeditationSession,
   unpackDayEntry,
+  unpackGlobalInbox,
   unpackHabit,
   unpackHabitLog,
   unpackMeditationSession,
 } from "@/lib/firestore-crypto";
 import type {
   DayEntry,
+  DayTodo,
+  DayTodoSummary,
+  GlobalInbox,
   Habit,
   HabitKind,
   HabitLog,
@@ -33,6 +38,7 @@ const CHANGE_EVENT = "moodtracker:change";
 
 let currentUid: string | null = null;
 let cache: MoodStore = emptyCache();
+let globalInbox: GlobalInbox = emptyGlobalInbox();
 let snapshotsReady = false;
 const listeners = new Set<() => void>();
 let snapshotUnsubs: (() => void)[] = [];
@@ -44,6 +50,10 @@ function emptyCache(): MoodStore {
     habit_logs: [],
     meditation_sessions: [],
   };
+}
+
+function emptyGlobalInbox(): GlobalInbox {
+  return { note: null, todos: [], updated_at: new Date().toISOString() };
 }
 
 function notify() {
@@ -67,6 +77,7 @@ export function setStoreUser(uid: string | null) {
   snapshotUnsubs = [];
   currentUid = uid;
   cache = emptyCache();
+  globalInbox = emptyGlobalInbox();
   snapshotsReady = false;
 
   if (!uid) return;
@@ -76,7 +87,7 @@ export function setStoreUser(uid: string | null) {
   let received = 0;
   const markReady = () => {
     received += 1;
-    if (received >= 4) {
+    if (received >= 5) {
       snapshotsReady = true;
       notify();
     }
@@ -129,6 +140,20 @@ export function setStoreUser(uid: string | null) {
       })();
     })
   );
+
+  snapshotUnsubs.push(
+    onSnapshot(doc(db, ...base, "meta", "global_inbox"), (snap) => {
+      void (async () => {
+        if (snap.exists()) {
+          globalInbox = await unpackGlobalInbox(snap.data());
+        } else {
+          globalInbox = emptyGlobalInbox();
+        }
+        markReady();
+        notify();
+      })();
+    })
+  );
 }
 
 export function subscribeStore(listener: () => void) {
@@ -150,7 +175,7 @@ export function getDayEntry(dateKey: string): DayEntry | null {
 
 export async function upsertDayEntry(
   dateKey: string,
-  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text">>
+  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text" | "todos">>
 ): Promise<DayEntry> {
   const uid = requireUid();
   const now = new Date().toISOString();
@@ -166,6 +191,8 @@ export async function upsertDayEntry(
       patch.journal_text !== undefined
         ? patch.journal_text
         : (existing?.journal_text ?? null),
+    todos:
+      patch.todos !== undefined ? patch.todos : (existing?.todos ?? []),
     created_at: existing?.created_at ?? now,
     updated_at: now,
   };
@@ -218,6 +245,60 @@ export function getMonthMeditationDays(
     }
   });
   return map;
+}
+
+function summarizeTodos(todos: DayTodo[]): DayTodoSummary | null {
+  if (todos.length === 0) return null;
+  const pending = todos.filter((t) => !t.done);
+  return {
+    total: todos.length,
+    done: todos.length - pending.length,
+    preview: pending[0]?.text ?? null,
+  };
+}
+
+export function getMonthTodoDays(
+  year: number,
+  month: number
+): Record<string, DayTodoSummary> {
+  const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  const map: Record<string, DayTodoSummary> = {};
+  cache.day_entries.forEach((e) => {
+    if (e.entry_date >= start && e.entry_date <= end) {
+      const summary = summarizeTodos(e.todos ?? []);
+      if (summary) map[e.entry_date] = summary;
+    }
+  });
+  return map;
+}
+
+export function getGlobalInbox(): GlobalInbox {
+  return globalInbox;
+}
+
+export async function upsertGlobalInbox(
+  patch: Partial<Pick<GlobalInbox, "note" | "todos">>
+): Promise<GlobalInbox> {
+  const uid = requireUid();
+  const now = new Date().toISOString();
+  const next: GlobalInbox = {
+    note: patch.note !== undefined ? patch.note : globalInbox.note,
+    todos: patch.todos !== undefined ? patch.todos : globalInbox.todos,
+    updated_at: now,
+  };
+
+  globalInbox = next;
+  notify();
+
+  await setDoc(
+    doc(getFirebaseDb(), "users", uid, "meta", "global_inbox"),
+    await packGlobalInbox(next)
+  );
+
+  return next;
 }
 
 export function getHabits(): Habit[] {

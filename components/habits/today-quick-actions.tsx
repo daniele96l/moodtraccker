@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Check, Flower2, ShieldCheck } from "lucide-react";
+import { BookOpen, Check, Flower2, ListTodo, ShieldCheck } from "lucide-react";
+import { useDayTodos } from "@/lib/hooks/use-day-todos";
 import { useHabits } from "@/lib/hooks/use-habits";
 import { habitDisplayLabel } from "@/lib/habit-utils";
 import {
@@ -20,6 +21,7 @@ interface TodayQuickActionsProps {
 export function TodayQuickActions({ onOpenDay }: TodayQuickActionsProps) {
   const today = toDateKey(new Date());
   const { habits, logs, loading, toggleHabit } = useHabits(today);
+  const { todos, toggleTodo } = useDayTodos(today);
   const [hasJournal, setHasJournal] = useState(false);
   const [meditationCount, setMeditationCount] = useState(0);
 
@@ -118,6 +120,43 @@ export function TodayQuickActions({ onOpenDay }: TodayQuickActionsProps) {
             {hasJournal ? "Entry saved" : "Write today"}
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => onOpenDay("plan")}
+          className={cn(
+            "shrink-0 rounded-full border px-3 py-1.5 text-left transition-all active:scale-95",
+            todos.some((t) => !t.done)
+              ? "border-primary/30 bg-primary/10 text-foreground"
+              : "border-border/60 bg-card/90 text-muted-foreground hover:border-primary/30"
+          )}
+        >
+          <span className="flex items-center gap-1.5 text-xs font-medium">
+            {todos.some((t) => !t.done) && (
+              <ListTodo className="h-3 w-3 text-primary" />
+            )}
+            Plan
+          </span>
+          <span className="block text-[10px] opacity-70">
+            {todos.filter((t) => !t.done).length > 0
+              ? `${todos.filter((t) => !t.done).length} to do`
+              : "Add tasks"}
+          </span>
+        </button>
+
+        {todos
+          .filter((t) => !t.done)
+          .map((todo) => (
+            <button
+              key={todo.id}
+              type="button"
+              onClick={() => toggleTodo(todo.id)}
+              className="max-w-[9rem] shrink-0 rounded-full border border-border/60 bg-card/90 px-3 py-1.5 text-left transition-all active:scale-95 hover:border-primary/30"
+            >
+              <span className="block truncate text-xs font-medium">{todo.text}</span>
+              <span className="block text-[10px] opacity-70">Tap to complete</span>
+            </button>
+          ))}
 
         {!loading &&
           habitItems.map((h) => renderChip(h.id, h.name, "habit"))}

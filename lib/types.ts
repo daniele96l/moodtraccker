@@ -1,4 +1,16 @@
-export type DayTab = "mood" | "journal" | "habits" | "meditate";
+export type DayTab = "mood" | "journal" | "habits" | "meditate" | "plan";
+
+export interface DayTodo {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface DayTodoSummary {
+  total: number;
+  done: number;
+  preview: string | null;
+}
 
 export type HabitKind = "habit" | "vice";
 
@@ -9,7 +21,14 @@ export interface DayEntry {
   entry_date: string;
   mood_score: number | null;
   journal_text: string | null;
+  todos: DayTodo[];
   created_at: string;
+  updated_at: string;
+}
+
+export interface GlobalInbox {
+  note: string | null;
+  todos: DayTodo[];
   updated_at: string;
 }
 

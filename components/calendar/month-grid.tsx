@@ -10,9 +10,10 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { Flower2 } from "lucide-react";
+import { Flower2, ListTodo } from "lucide-react";
 import { moodColor } from "@/lib/mood-colors";
 import { useTheme } from "@/lib/hooks/use-theme";
+import type { DayTodoSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface MonthGridProps {
@@ -20,6 +21,7 @@ interface MonthGridProps {
   month: number;
   moods: Record<string, number | null>;
   meditatedDays: Record<string, boolean>;
+  todoDays: Record<string, DayTodoSummary>;
   onDayClick: (dateKey: string) => void;
 }
 
@@ -30,6 +32,7 @@ export function MonthGrid({
   month,
   moods,
   meditatedDays,
+  todoDays,
   onDayClick,
 }: MonthGridProps) {
   const isDark = useTheme() === "dark";
@@ -59,6 +62,11 @@ export function MonthGrid({
           const score = moods[dateKey] ?? null;
           const isToday = isSameDay(day, today);
           const meditated = meditatedDays[dateKey];
+          const todoSummary = todoDays[dateKey];
+          const hasTodos = !!todoSummary;
+          const pendingCount = todoSummary
+            ? todoSummary.total - todoSummary.done
+            : 0;
 
           return (
             <button
@@ -68,7 +76,8 @@ export function MonthGrid({
               disabled={!inMonth}
               onClick={() => inMonth && onDayClick(dateKey)}
               className={cn(
-                "relative flex aspect-square w-full max-w-[40px] items-center justify-center rounded-md transition-transform active:scale-95",
+                "relative flex aspect-square w-full max-w-[40px] flex-col items-center justify-center rounded-md transition-transform active:scale-95",
+                isToday && hasTodos && "max-h-none min-h-[52px]",
                 isToday && "scroll-mt-32",
                 !inMonth && "invisible pointer-events-none",
                 inMonth && "cursor-pointer hover:ring-2 hover:ring-primary/25 hover:shadow-sm",
@@ -76,9 +85,11 @@ export function MonthGrid({
               )}
               style={{ backgroundColor: moodColor(score, isDark) }}
               aria-label={
-                meditated
-                  ? `${format(day, "MMMM d, yyyy")} — meditated`
-                  : format(day, "MMMM d, yyyy")
+                hasTodos
+                  ? `${format(day, "MMMM d, yyyy")} — ${pendingCount} planned`
+                  : meditated
+                    ? `${format(day, "MMMM d, yyyy")} — meditated`
+                    : format(day, "MMMM d, yyyy")
               }
             >
               <span
@@ -90,6 +101,25 @@ export function MonthGrid({
               >
                 {format(day, "d")}
               </span>
+              {isToday && todoSummary?.preview && inMonth && (
+                <span
+                  className={cn(
+                    "mt-0.5 line-clamp-2 w-full px-0.5 text-center text-[6px] leading-tight",
+                    isDark ? "text-white/85" : "text-foreground/80"
+                  )}
+                  title={todoSummary.preview}
+                >
+                  {todoSummary.preview}
+                </span>
+              )}
+              {hasTodos && inMonth && !isToday && (
+                <span
+                  className="absolute bottom-0.5 left-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-primary/20"
+                  title={`${pendingCount} to do`}
+                >
+                  <ListTodo className="h-2 w-2 text-primary/75" strokeWidth={2.5} />
+                </span>
+              )}
               {meditated && inMonth && (
                 <span
                   className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-primary/20"

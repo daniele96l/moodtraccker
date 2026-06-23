@@ -4,6 +4,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { EncryptionProvider } from "@/lib/encryption-context";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { EncryptionGate } from "@/components/auth/encryption-gate";
+import { GlobalInbox } from "@/components/global/global-inbox";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -39,7 +40,10 @@ export default function RootLayout({
         <AuthProvider>
           <EncryptionProvider>
             <AuthGate>
-              <EncryptionGate>{children}</EncryptionGate>
+              <EncryptionGate>
+                {children}
+                <GlobalInbox />
+              </EncryptionGate>
             </AuthGate>
           </EncryptionProvider>
         </AuthProvider>

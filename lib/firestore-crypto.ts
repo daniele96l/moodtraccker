@@ -8,17 +8,22 @@ import {
 } from "@/lib/encryption";
 import type {
   DayEntry,
+  GlobalInbox,
   Habit,
   HabitLog,
   MeditationSession,
 } from "@/lib/types";
 
 export async function packDayEntry(
-  entry: Pick<DayEntry, "mood_score" | "journal_text" | "created_at" | "updated_at">
+  entry: Pick<
+    DayEntry,
+    "mood_score" | "journal_text" | "todos" | "created_at" | "updated_at"
+  >
 ): Promise<DocumentData> {
   const encrypted = await encryptPayload({
     mood_score: entry.mood_score,
     journal_text: entry.journal_text,
+    todos: entry.todos,
   });
   return {
     ...encrypted,
@@ -36,12 +41,14 @@ export async function unpackDayEntry(
     const payload = await decryptPayload<{
       mood_score: number | null;
       journal_text: string | null;
+      todos?: DayEntry["todos"];
     }>(data);
     return {
       id: dateKey,
       entry_date: dateKey,
       mood_score: payload.mood_score,
       journal_text: payload.journal_text,
+      todos: payload.todos ?? [],
       created_at: (data.created_at as string) ?? now,
       updated_at: (data.updated_at as string) ?? now,
     };
@@ -52,6 +59,7 @@ export async function unpackDayEntry(
     entry_date: dateKey,
     mood_score: data.mood_score ?? null,
     journal_text: data.journal_text ?? null,
+    todos: data.todos ?? [],
     created_at: (data.created_at as string) ?? now,
     updated_at: (data.updated_at as string) ?? now,
   };
@@ -139,5 +147,37 @@ export async function unpackMeditationSession(
     duration_seconds: data.duration_seconds,
     pattern: data.pattern ?? null,
     completed_at: data.completed_at,
+  };
+}
+
+export async function packGlobalInbox(inbox: GlobalInbox): Promise<DocumentData> {
+  const encrypted = await encryptPayload({
+    note: inbox.note,
+    todos: inbox.todos,
+  });
+  return {
+    ...encrypted,
+    updated_at: inbox.updated_at,
+  };
+}
+
+export async function unpackGlobalInbox(data: DocumentData): Promise<GlobalInbox> {
+  const now = new Date().toISOString();
+  if (isEncryptedDoc(data)) {
+    const payload = await decryptPayload<{
+      note: string | null;
+      todos: GlobalInbox["todos"];
+    }>(data);
+    return {
+      note: payload.note,
+      todos: payload.todos ?? [],
+      updated_at: (data.updated_at as string) ?? now,
+    };
+  }
+
+  return {
+    note: data.note ?? null,
+    todos: data.todos ?? [],
+    updated_at: (data.updated_at as string) ?? now,
   };
 }

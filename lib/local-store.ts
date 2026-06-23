@@ -57,7 +57,7 @@ export function getDayEntry(dateKey: string): DayEntry | null {
 
 export function upsertDayEntry(
   dateKey: string,
-  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text">>
+  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text" | "todos">>
 ): DayEntry {
   const store = loadRaw();
   const now = new Date().toISOString();
@@ -78,6 +78,7 @@ export function upsertDayEntry(
     entry_date: dateKey,
     mood_score: patch.mood_score ?? null,
     journal_text: patch.journal_text ?? null,
+    todos: patch.todos ?? [],
     created_at: now,
     updated_at: now,
   };
