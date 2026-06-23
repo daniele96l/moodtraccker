@@ -12,6 +12,7 @@ import {
 } from "date-fns";
 import { Flower2 } from "lucide-react";
 import { moodColor } from "@/lib/mood-colors";
+import { useTheme } from "@/lib/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
 interface MonthGridProps {
@@ -31,6 +32,7 @@ export function MonthGrid({
   meditatedDays,
   onDayClick,
 }: MonthGridProps) {
+  const isDark = useTheme() === "dark";
   const monthStart = startOfMonth(new Date(year, month, 1));
   const monthEnd = endOfMonth(monthStart);
   const gridStart = startOfWeek(monthStart);
@@ -72,7 +74,7 @@ export function MonthGrid({
                 inMonth && "cursor-pointer hover:ring-2 hover:ring-primary/25 hover:shadow-sm",
                 isToday && "font-semibold ring-2 ring-primary/50 ring-offset-2 ring-offset-background shadow-sm"
               )}
-              style={{ backgroundColor: moodColor(score) }}
+              style={{ backgroundColor: moodColor(score, isDark) }}
               aria-label={
                 meditated
                   ? `${format(day, "MMMM d, yyyy")} — meditated`
@@ -81,15 +83,16 @@ export function MonthGrid({
             >
               <span
                 className={cn(
-                  "text-[11px] tabular-nums text-foreground/70",
-                  isToday && "text-foreground"
+                  "text-[11px] tabular-nums",
+                  isDark ? "text-white/75" : "text-foreground/70",
+                  isToday && (isDark ? "text-white" : "text-foreground")
                 )}
               >
                 {format(day, "d")}
               </span>
               {meditated && inMonth && (
                 <span
-                  className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/85 shadow-sm ring-1 ring-primary/15 dark:bg-black/50 dark:ring-primary/25"
+                  className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-primary/20"
                   title="Meditated"
                 >
                   <Flower2 className="h-2 w-2 text-primary/75" strokeWidth={2.5} />

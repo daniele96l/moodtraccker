@@ -16,6 +16,7 @@ import { MeditationTimer } from "@/components/meditation/meditation-timer";
 import { useDayEntry } from "@/lib/hooks/use-day-entry";
 import { useHabits } from "@/lib/hooks/use-habits";
 import { moodColor } from "@/lib/mood-colors";
+import { useTheme } from "@/lib/hooks/use-theme";
 import {
   getMeditationSessions,
   subscribeStore,
@@ -31,6 +32,7 @@ interface DaySheetProps {
 }
 
 export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: DaySheetProps) {
+  const isDark = useTheme() === "dark";
   const { entry, loading, upsert } = useDayEntry(dateKey);
   const {
     habits,
@@ -93,7 +95,7 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
         <div
           className="relative border-b border-border/40 px-6 pb-4 pt-6"
           style={{
-            background: `linear-gradient(180deg, ${moodColor(mood)}55 0%, transparent 100%)`,
+            background: `linear-gradient(180deg, ${moodColor(mood, isDark)}55 0%, transparent 100%)`,
           }}
         >
           <DialogHeader className="gap-1 text-left">

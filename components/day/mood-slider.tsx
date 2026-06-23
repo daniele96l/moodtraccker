@@ -1,6 +1,7 @@
 "use client";
 
 import { moodColor, MOOD_LABELS } from "@/lib/mood-colors";
+import { useTheme } from "@/lib/hooks/use-theme";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
@@ -10,14 +11,21 @@ interface MoodSliderProps {
 }
 
 export function MoodSlider({ value, onChange }: MoodSliderProps) {
+  const isDark = useTheme() === "dark";
+
   return (
     <div className="space-y-6 py-2">
       <div className="flex flex-col items-center">
         <div
           className="flex h-20 w-20 items-center justify-center rounded-full shadow-inner transition-colors duration-300"
-          style={{ backgroundColor: moodColor(value) }}
+          style={{ backgroundColor: moodColor(value, isDark) }}
         >
-          <span className="text-3xl font-light tabular-nums text-foreground/75">
+          <span
+            className={cn(
+              "text-3xl font-light tabular-nums",
+              isDark ? "text-white/85" : "text-foreground/75"
+            )}
+          >
             {value}
           </span>
         </div>
@@ -54,7 +62,7 @@ export function MoodSlider({ value, onChange }: MoodSliderProps) {
               "h-2 flex-1 rounded-full transition-all",
               n === value ? "scale-110 ring-2 ring-primary/30 ring-offset-1" : "opacity-60 hover:opacity-100"
             )}
-            style={{ backgroundColor: moodColor(n) }}
+            style={{ backgroundColor: moodColor(n, isDark) }}
             aria-label={`Mood ${n}`}
           />
         ))}

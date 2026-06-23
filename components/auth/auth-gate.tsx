@@ -8,7 +8,20 @@ import { useEncryption } from "@/lib/encryption-context";
 import { getMigrationStatus, isStoreReady } from "@/lib/firestore-store";
 import { loadRaw } from "@/lib/local-store";
 
+const OAUTH_SETUP_URL =
+  "https://console.cloud.google.com/auth/overview?project=progetto3-7e3ca";
 const STORAGE_KEY = "moodtracker_data";
+
+function formatSignInError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message.includes("restricted_client") ||
+    message.includes("not yet configured")
+  ) {
+    return "oauth_setup";
+  }
+  return message || "Sign-in failed";
+}
 
 function hasLocalDataOnDevice(): boolean {
   if (typeof window === "undefined") return false;
@@ -88,7 +101,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     try {
       await signInWithGoogle();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed");
+      setError(formatSignInError(e));
     } finally {
       setSigningIn(false);
     }
@@ -114,8 +127,31 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             Journal and habits are encrypted before they reach the cloud.
           </p>
 
-          {error && (
-            <p className="mb-4 text-center text-sm text-destructive">{error}</p>
+          {error === "oauth_setup" ? (
+            <div className="mb-4 space-y-2 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-left text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+              <p className="font-medium">Google OAuth is not configured yet.</p>
+              <p className="text-xs opacity-90">
+                One-time setup in Google Cloud (about 2 minutes):
+              </p>
+              <ol className="list-decimal space-y-1 pl-4 text-xs opacity-90">
+                <li>Open the OAuth consent screen link below</li>
+                <li>Set app name + support email, choose External</li>
+                <li>Add <strong>daniele96ligato@gmail.com</strong> as a test user</li>
+                <li>Save, then try sign-in again</li>
+              </ol>
+              <a
+                href={OAUTH_SETUP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-xs font-medium underline"
+              >
+                Configure OAuth consent screen
+              </a>
+            </div>
+          ) : (
+            error && (
+              <p className="mb-4 text-center text-sm text-destructive">{error}</p>
+            )
           )}
 
           <Button
@@ -129,6 +165,17 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
           <p className="mt-4 text-center text-[10px] text-muted-foreground/60">
             End-to-end encrypted · only you can read your data
+          </p>
+          <p className="mt-2 text-center text-[10px] text-muted-foreground/50">
+            First time?{" "}
+            <a
+              href={OAUTH_SETUP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              Set up Google OAuth
+            </a>
           </p>
         </div>
       </div>

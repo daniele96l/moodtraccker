@@ -11,11 +11,30 @@ const MOOD_COLORS: Record<number, string> = {
   10: "#b8e8c8",
 };
 
-export const EMPTY_DAY_COLOR = "#f5f3ff";
+const DARK_MOOD_COLORS: Record<number, string> = {
+  1: "#4a3542",
+  2: "#4d3845",
+  3: "#52403c",
+  4: "#55463c",
+  5: "#4a4554",
+  6: "#424f58",
+  7: "#3d524c",
+  8: "#38554a",
+  9: "#35574c",
+  10: "#325a4e",
+};
 
-export function moodColor(score: number | null | undefined): string {
-  if (score == null || score < 1 || score > 10) return EMPTY_DAY_COLOR;
-  return MOOD_COLORS[Math.round(score)] ?? EMPTY_DAY_COLOR;
+export const EMPTY_DAY_COLOR = "#f5f3ff";
+export const DARK_EMPTY_DAY_COLOR = "#34323f";
+
+export function moodColor(
+  score: number | null | undefined,
+  isDark = false
+): string {
+  const empty = isDark ? DARK_EMPTY_DAY_COLOR : EMPTY_DAY_COLOR;
+  if (score == null || score < 1 || score > 10) return empty;
+  const palette = isDark ? DARK_MOOD_COLORS : MOOD_COLORS;
+  return palette[Math.round(score)] ?? empty;
 }
 
 export const MOOD_LABELS: Record<number, string> = {
