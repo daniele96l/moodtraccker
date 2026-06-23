@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,10 +14,13 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { getFirebaseDb } from "@/lib/firebase";
 import {
+  clearSessionKey,
   deriveEncryptionKey,
   decryptPayload,
   encryptPayload,
   generateSaltB64,
+  loadSessionKey,
+  saveSessionKey,
   setActiveEncryptionKey,
 } from "@/lib/encryption";
 import { setStoreUser } from "@/lib/firestore-store";
@@ -40,8 +44,10 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saltB64, setSaltB64] = useState<string | null>(null);
+  const lastUidRef = useRef<string | null>(null);
 
   const reset = useCallback(() => {
+    if (lastUidRef.current) clearSessionKey(lastUidRef.current);
     setUnlocked(false);
     setNeedsSetup(null);
     setSaltB64(null);
@@ -51,10 +57,14 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      reset();
+    if (user) {
+      lastUidRef.current = user.uid;
       return;
     }
+    reset();
+  }, [user, reset]);
+  useEffect(() => {
+    if (!user) return;
 
     let cancelled = false;
     setLoading(true);
@@ -65,9 +75,30 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         doc(getFirebaseDb(), "users", user.uid, "meta", "encryption")
       );
       if (cancelled) return;
-      if (snap.exists() && snap.data()?.salt) {
-        setSaltB64(snap.data()!.salt as string);
+
+      const hasSalt = snap.exists() && snap.data()?.salt;
+      if (hasSalt) {
+        const salt = snap.data()!.salt as string;
+        setSaltB64(salt);
         setNeedsSetup(false);
+
+        const sessionKey = await loadSessionKey(user.uid);
+        if (sessionKey) {
+          setActiveEncryptionKey(sessionKey);
+          try {
+            const probe = snap.data()?.probe;
+            if (probe) {
+              await decryptPayload<{ ok: boolean }>(probe);
+            }
+            setStoreUser(user.uid);
+            setUnlocked(true);
+            setLoading(false);
+            return;
+          } catch {
+            clearSessionKey(user.uid);
+            setActiveEncryptionKey(null);
+          }
+        }
       } else {
         setNeedsSetup(true);
       }
@@ -82,7 +113,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, reset]);
+  }, [user]);
 
   const setupPassphrase = useCallback(
     async (passphrase: string, confirm: string) => {
@@ -114,6 +145,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         setUnlocked(true);
         setNeedsSetup(false);
         setError(null);
+        await saveSessionKey(user.uid, key);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Setup failed");
         setActiveEncryptionKey(null);
@@ -144,11 +176,13 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         setStoreUser(user.uid);
         setUnlocked(true);
         setError(null);
+        await saveSessionKey(user.uid, key);
       } catch {
         setError("Wrong passphrase. Your data stays locked.");
         setActiveEncryptionKey(null);
         setStoreUser(null);
         setUnlocked(false);
+        if (user) clearSessionKey(user.uid);
       } finally {
         setLoading(false);
       }
@@ -157,6 +191,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
   );
 
   const lock = useCallback(() => {
+    if (lastUidRef.current) clearSessionKey(lastUidRef.current);
     setActiveEncryptionKey(null);
     setStoreUser(null);
     setUnlocked(false);

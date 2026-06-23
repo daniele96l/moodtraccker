@@ -42,9 +42,37 @@ export async function deriveEncryptionKey(
     },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
-    false,
+    true,
     ["encrypt", "decrypt"]
   );
+}
+
+const SESSION_KEY_PREFIX = "moodtracker-session-key-";
+
+export async function saveSessionKey(uid: string, key: CryptoKey) {
+  const jwk = await crypto.subtle.exportKey("jwk", key);
+  sessionStorage.setItem(`${SESSION_KEY_PREFIX}${uid}`, JSON.stringify(jwk));
+}
+
+export async function loadSessionKey(uid: string): Promise<CryptoKey | null> {
+  const raw = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${uid}`);
+  if (!raw) return null;
+  try {
+    const jwk = JSON.parse(raw);
+    return crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function clearSessionKey(uid: string) {
+  sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${uid}`);
 }
 
 export function isEncryptedDoc(data: {
