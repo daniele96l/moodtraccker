@@ -2,11 +2,13 @@
 
 import { useCallback } from "react";
 import { useDayEntry } from "@/lib/hooks/use-day-entry";
+import { createPlanItem, normalizePlanItem } from "@/lib/plan-utils";
 import type { DayTodo } from "@/lib/types";
+import type { PlanItemInput } from "@/lib/plan-utils";
 
 export function useDayTodos(dateKey: string) {
   const { entry, loading, upsert } = useDayEntry(dateKey);
-  const todos = entry?.todos ?? [];
+  const todos = (entry?.todos ?? []).map(normalizePlanItem);
 
   const saveTodos = useCallback(
     (next: DayTodo[]) => {
@@ -16,13 +18,9 @@ export function useDayTodos(dateKey: string) {
   );
 
   const addTodo = useCallback(
-    (text: string) => {
-      const todo: DayTodo = {
-        id: crypto.randomUUID(),
-        text,
-        done: false,
-      };
-      saveTodos([...todos, todo]);
+    (input: PlanItemInput) => {
+      if (!input.text.trim()) return;
+      saveTodos([...todos, createPlanItem(input)]);
     },
     [todos, saveTodos]
   );
@@ -43,9 +41,24 @@ export function useDayTodos(dateKey: string) {
     [todos, saveTodos]
   );
 
-  const updateTodoText = useCallback(
-    (id: string, text: string) => {
-      saveTodos(todos.map((t) => (t.id === id ? { ...t, text } : t)));
+  const updateTodo = useCallback(
+    (id: string, patch: Partial<PlanItemInput>) => {
+      saveTodos(
+        todos.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                ...patch,
+                text: patch.text?.trim() || t.text,
+                time: patch.time !== undefined ? patch.time || null : t.time,
+                location:
+                  patch.location !== undefined
+                    ? patch.location?.trim() || null
+                    : t.location,
+              }
+            : t
+        )
+      );
     },
     [todos, saveTodos]
   );
@@ -56,6 +69,6 @@ export function useDayTodos(dateKey: string) {
     addTodo,
     toggleTodo,
     removeTodo,
-    updateTodoText,
+    updateTodo,
   };
 }

@@ -1,8 +1,10 @@
-export type DayTab = "mood" | "journal" | "habits" | "meditate" | "plan";
+export type DayTab = "mood" | "journal" | "habits" | "meditate";
 
 export interface DayTodo {
   id: string;
   text: string;
+  time: string | null;
+  location: string | null;
   done: boolean;
 }
 
@@ -26,8 +28,16 @@ export interface DayEntry {
   updated_at: string;
 }
 
+export interface InboxNote {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GlobalInbox {
-  note: string | null;
+  notes: InboxNote[];
   todos: DayTodo[];
   updated_at: string;
 }

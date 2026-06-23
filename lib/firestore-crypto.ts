@@ -152,7 +152,7 @@ export async function unpackMeditationSession(
 
 export async function packGlobalInbox(inbox: GlobalInbox): Promise<DocumentData> {
   const encrypted = await encryptPayload({
-    note: inbox.note,
+    notes: inbox.notes,
     todos: inbox.todos,
   });
   return {
@@ -161,23 +161,51 @@ export async function packGlobalInbox(inbox: GlobalInbox): Promise<DocumentData>
   };
 }
 
+function migrateLegacyInbox(payload: {
+  note?: string | null;
+  notes?: GlobalInbox["notes"];
+  todos?: GlobalInbox["todos"];
+}): Pick<GlobalInbox, "notes" | "todos"> {
+  const todos = payload.todos ?? [];
+  let notes = payload.notes ?? [];
+  if (notes.length === 0 && payload.note?.trim()) {
+    const body = payload.note.trim();
+    const now = new Date().toISOString();
+    notes = [
+      {
+        id: crypto.randomUUID(),
+        title: body.split("\n")[0]?.trim().slice(0, 120) ?? "",
+        body,
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+  }
+  return { notes, todos };
+}
+
 export async function unpackGlobalInbox(data: DocumentData): Promise<GlobalInbox> {
   const now = new Date().toISOString();
   if (isEncryptedDoc(data)) {
     const payload = await decryptPayload<{
-      note: string | null;
+      note?: string | null;
+      notes?: GlobalInbox["notes"];
       todos: GlobalInbox["todos"];
     }>(data);
+    const migrated = migrateLegacyInbox(payload);
     return {
-      note: payload.note,
-      todos: payload.todos ?? [],
+      ...migrated,
       updated_at: (data.updated_at as string) ?? now,
     };
   }
 
-  return {
+  const migrated = migrateLegacyInbox({
     note: data.note ?? null,
+    notes: data.notes ?? [],
     todos: data.todos ?? [],
+  });
+  return {
+    ...migrated,
     updated_at: (data.updated_at as string) ?? now,
   };
 }

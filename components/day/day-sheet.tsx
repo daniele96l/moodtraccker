@@ -13,9 +13,7 @@ import { MoodSlider } from "@/components/day/mood-slider";
 import { JournalEditor } from "@/components/day/journal-editor";
 import { HabitList } from "@/components/day/habit-list";
 import { MeditationTimer } from "@/components/meditation/meditation-timer";
-import { TodoList } from "@/components/day/todo-list";
 import { useDayEntry } from "@/lib/hooks/use-day-entry";
-import { useDayTodos } from "@/lib/hooks/use-day-todos";
 import { useHabits } from "@/lib/hooks/use-habits";
 import { moodColor } from "@/lib/mood-colors";
 import { useTheme } from "@/lib/hooks/use-theme";
@@ -36,13 +34,6 @@ interface DaySheetProps {
 export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: DaySheetProps) {
   const isDark = useTheme() === "dark";
   const { entry, loading, upsert } = useDayEntry(dateKey);
-  const {
-    todos,
-    loading: todosLoading,
-    addTodo,
-    toggleTodo,
-    removeTodo,
-  } = useDayTodos(dateKey);
   const {
     habits,
     logs,
@@ -122,7 +113,7 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
             </div>
           ) : (
             <Tabs value={tab} onValueChange={(v) => setTab(v as DayTab)} className="flex min-h-0 flex-col">
-              <TabsList className="mb-4 grid h-9 w-full shrink-0 grid-cols-5 rounded-full bg-muted/60 p-0.5">
+              <TabsList className="mb-4 grid h-9 w-full shrink-0 grid-cols-4 rounded-full bg-muted/60 p-0.5">
                 <TabsTrigger
                   value="mood"
                   className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
@@ -140,12 +131,6 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
                   className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
                 >
                   Habits
-                </TabsTrigger>
-                <TabsTrigger
-                  value="plan"
-                  className="rounded-full text-xs data-active:bg-background data-active:shadow-sm"
-                >
-                  Plan
                 </TabsTrigger>
                 <TabsTrigger
                   value="meditate"
@@ -177,18 +162,6 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
                   onMarkAllVices={markAllVicesAvoided}
                   onArchive={archiveHabit}
                   loading={habitsLoading}
-                />
-              </TabsContent>
-
-              <TabsContent value="plan" className="mt-0 outline-none">
-                <TodoList
-                  todos={todos}
-                  loading={todosLoading}
-                  placeholder="What do you need to do?"
-                  emptyLabel="No plans for this day"
-                  onAdd={addTodo}
-                  onToggle={toggleTodo}
-                  onRemove={removeTodo}
                 />
               </TabsContent>
 

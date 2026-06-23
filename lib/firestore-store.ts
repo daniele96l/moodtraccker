@@ -33,6 +33,7 @@ import type {
   MeditationSession,
 } from "@/lib/types";
 import type { MoodStore } from "@/lib/local-store";
+import { planPreview, sortPlanItems } from "@/lib/plan-utils";
 
 const CHANGE_EVENT = "moodtracker:change";
 
@@ -53,7 +54,7 @@ function emptyCache(): MoodStore {
 }
 
 function emptyGlobalInbox(): GlobalInbox {
-  return { note: null, todos: [], updated_at: new Date().toISOString() };
+  return { notes: [], todos: [], updated_at: new Date().toISOString() };
 }
 
 function notify() {
@@ -249,11 +250,12 @@ export function getMonthMeditationDays(
 
 function summarizeTodos(todos: DayTodo[]): DayTodoSummary | null {
   if (todos.length === 0) return null;
-  const pending = todos.filter((t) => !t.done);
+  const pending = sortPlanItems(todos.filter((t) => !t.done));
+  const first = pending[0];
   return {
     total: todos.length,
     done: todos.length - pending.length,
-    preview: pending[0]?.text ?? null,
+    preview: first ? planPreview(first) : null,
   };
 }
 
@@ -280,12 +282,12 @@ export function getGlobalInbox(): GlobalInbox {
 }
 
 export async function upsertGlobalInbox(
-  patch: Partial<Pick<GlobalInbox, "note" | "todos">>
+  patch: Partial<Pick<GlobalInbox, "notes" | "todos">>
 ): Promise<GlobalInbox> {
   const uid = requireUid();
   const now = new Date().toISOString();
   const next: GlobalInbox = {
-    note: patch.note !== undefined ? patch.note : globalInbox.note,
+    notes: patch.notes !== undefined ? patch.notes : globalInbox.notes,
     todos: patch.todos !== undefined ? patch.todos : globalInbox.todos,
     updated_at: now,
   };

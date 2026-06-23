@@ -20,7 +20,7 @@ interface MonthBlockProps {
 
 function MonthBlock({ year, month, refreshKey, onDayClick }: MonthBlockProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const { moods, meditatedDays, todoDays, loading } = useMonthMoods(year, month, refreshKey);
+  const { moods, meditatedDays, loading } = useMonthMoods(year, month, refreshKey);
   const now = new Date();
   const isCurrentMonth =
     year === now.getFullYear() && month === now.getMonth();
@@ -50,7 +50,6 @@ function MonthBlock({ year, month, refreshKey, onDayClick }: MonthBlockProps) {
           month={month}
           moods={moods}
           meditatedDays={meditatedDays}
-          todoDays={todoDays}
           onDayClick={onDayClick}
         />
       )}
