@@ -4,7 +4,6 @@ export type PlanItemInput = Pick<DayTodo, "text" | "time" | "location">;
 
 export function sortPlanItems(todos: DayTodo[]): DayTodo[] {
   return [...todos].sort((a, b) => {
-    if (a.done !== b.done) return a.done ? 1 : -1;
     if (a.time && b.time) return a.time.localeCompare(b.time);
     if (a.time) return -1;
     if (b.time) return 1;

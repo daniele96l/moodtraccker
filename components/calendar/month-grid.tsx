@@ -13,6 +13,7 @@ import {
 import { Flower2 } from "lucide-react";
 import { moodColor } from "@/lib/mood-colors";
 import { useTheme } from "@/lib/hooks/use-theme";
+import type { DayTodoSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface MonthGridProps {
@@ -20,6 +21,7 @@ interface MonthGridProps {
   month: number;
   moods: Record<string, number | null>;
   meditatedDays: Record<string, boolean>;
+  planDays: Record<string, DayTodoSummary>;
   onDayClick: (dateKey: string) => void;
 }
 
@@ -31,6 +33,7 @@ export function MonthGrid({
   month,
   moods,
   meditatedDays,
+  planDays,
   onDayClick,
 }: MonthGridProps) {
   const isDark = useTheme() === "dark";
@@ -53,13 +56,20 @@ export function MonthGrid({
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 justify-items-center gap-1">
+      <div className="grid grid-cols-7 justify-items-center gap-1 overflow-visible">
         {days.map((day) => {
           const dateKey = format(day, "yyyy-MM-dd");
           const inMonth = isSameMonth(day, monthStart);
           const score = moods[dateKey] ?? null;
           const isToday = isSameDay(day, today);
           const meditated = meditatedDays[dateKey];
+          const plan = planDays[dateKey];
+          const hasPlan = !!plan && plan.total > 0;
+          const planLabel = plan?.preview
+            ? ` — ${plan.preview}`
+            : plan
+              ? ` — ${plan.total} calendar item${plan.total > 1 ? "s" : ""}`
+              : "";
 
           return (
             <button
@@ -69,7 +79,7 @@ export function MonthGrid({
               disabled={!inMonth}
               onClick={() => inMonth && onDayClick(dateKey)}
               className={cn(
-                "relative flex aspect-square w-full max-w-[40px] items-center justify-center rounded-md transition-transform active:scale-95",
+                "relative flex aspect-square w-full max-w-[40px] items-center justify-center overflow-visible rounded-md transition-transform active:scale-95",
                 isToday && "scroll-mt-32",
                 !inMonth && "invisible pointer-events-none",
                 inMonth && "cursor-pointer hover:ring-2 hover:ring-primary/25 hover:shadow-sm",
@@ -78,8 +88,8 @@ export function MonthGrid({
               style={{ backgroundColor: moodColor(score, isDark) }}
               aria-label={
                 meditated
-                  ? `${format(day, "MMMM d, yyyy")} — meditated`
-                  : format(day, "MMMM d, yyyy")
+                  ? `${format(day, "MMMM d, yyyy")} — meditated${planLabel}`
+                  : `${format(day, "MMMM d, yyyy")}${planLabel}`
               }
             >
               <span
@@ -91,12 +101,25 @@ export function MonthGrid({
               >
                 {format(day, "d")}
               </span>
+              {hasPlan && inMonth && (
+                <span
+                  className="absolute bottom-0.5 left-0.5 h-1.5 w-1.5 rounded-full bg-primary ring-1 ring-background"
+                  title={
+                    plan.preview ??
+                    `${plan.total} calendar item${plan.total > 1 ? "s" : ""}`
+                  }
+                />
+              )}
               {meditated && inMonth && (
                 <span
-                  className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background/90 shadow-sm ring-1 ring-primary/20"
+                  className="absolute bottom-0.5 right-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow-md ring-1 ring-primary/50"
                   title="Meditated"
                 >
-                  <Flower2 className="h-2 w-2 text-primary/75" strokeWidth={2.5} />
+                  <Flower2
+                    className="h-2.5 w-2.5 text-primary"
+                    strokeWidth={2.5}
+                    aria-hidden
+                  />
                 </span>
               )}
             </button>

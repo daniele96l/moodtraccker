@@ -33,7 +33,8 @@ import type {
   MeditationSession,
 } from "@/lib/types";
 import type { MoodStore } from "@/lib/local-store";
-import { planPreview, sortPlanItems } from "@/lib/plan-utils";
+import { normalizePlanItem, planPreview, sortPlanItems } from "@/lib/plan-utils";
+import { toDateKey } from "@/lib/date-utils";
 
 const CHANGE_EVENT = "moodtracker:change";
 
@@ -231,6 +232,16 @@ export function getMonthMoods(
   return map;
 }
 
+function meditationSessionDate(session: MeditationSession): string | null {
+  const key = session.session_date?.trim();
+  if (key && /^\d{4}-\d{2}-\d{2}$/.test(key)) return key;
+  const fromCompleted = session.completed_at?.slice(0, 10);
+  if (fromCompleted && /^\d{4}-\d{2}-\d{2}$/.test(fromCompleted)) {
+    return fromCompleted;
+  }
+  return null;
+}
+
 export function getMonthMeditationDays(
   year: number,
   month: number
@@ -241,20 +252,20 @@ export function getMonthMeditationDays(
 
   const map: Record<string, boolean> = {};
   cache.meditation_sessions.forEach((s) => {
-    if (s.session_date >= start && s.session_date <= end) {
-      map[s.session_date] = true;
-    }
+    const dateKey = meditationSessionDate(s);
+    if (!dateKey || dateKey < start || dateKey > end) return;
+    map[dateKey] = true;
   });
   return map;
 }
 
 function summarizeTodos(todos: DayTodo[]): DayTodoSummary | null {
   if (todos.length === 0) return null;
-  const pending = sortPlanItems(todos.filter((t) => !t.done));
-  const first = pending[0];
+  const sorted = sortPlanItems(todos.map(normalizePlanItem));
+  const first = sorted[0];
   return {
     total: todos.length,
-    done: todos.length - pending.length,
+    done: 0,
     preview: first ? planPreview(first) : null,
   };
 }
@@ -301,6 +312,26 @@ export async function upsertGlobalInbox(
   );
 
   return next;
+}
+
+export function getUpcomingPlans(): Array<{ dateKey: string; todo: DayTodo }> {
+  const today = toDateKey(new Date());
+  const items: Array<{ dateKey: string; todo: DayTodo }> = [];
+
+  cache.day_entries.forEach((entry) => {
+    if (entry.entry_date < today) return;
+    sortPlanItems((entry.todos ?? []).map(normalizePlanItem)).forEach((todo) => {
+      items.push({ dateKey: entry.entry_date, todo });
+    });
+  });
+
+  return items.sort((a, b) => {
+    if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey);
+    if (a.todo.time && b.todo.time) return a.todo.time.localeCompare(b.todo.time);
+    if (a.todo.time) return -1;
+    if (b.todo.time) return 1;
+    return 0;
+  });
 }
 
 export function getHabits(): Habit[] {
@@ -461,7 +492,10 @@ export function getHabitLogs(habitId: string) {
 
 export function getMeditationSessions(dateKey: string): MeditationSession[] {
   return cache.meditation_sessions
-    .filter((s) => s.session_date === dateKey)
+    .filter(
+      (s) =>
+        meditationSessionDate(s) === dateKey && s.duration_seconds >= 10
+    )
     .sort(
       (a, b) =>
         new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()

@@ -2,14 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MonthGrid } from "@/components/calendar/month-grid";
-import { DaySheet } from "@/components/day/day-sheet";
 import { TodayQuickActions } from "@/components/habits/today-quick-actions";
 import { useMonthMoods } from "@/lib/hooks/use-month-moods";
 import { formatMonthLabel, toDateKey } from "@/lib/date-utils";
 import type { DayTab } from "@/lib/types";
+import { Calendar, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { cn } from "@/lib/utils";
+
+interface InfiniteCalendarProps {
+  onOpenDay: (dateKey: string, tab?: DayTab) => void;
+  refreshKey: number;
+  inboxOpen?: boolean;
+  scheduleOpen?: boolean;
+  onToggleInbox?: () => void;
+  onToggleSchedule?: () => void;
+}
 
 interface MonthBlockProps {
   year: number;
@@ -20,7 +30,7 @@ interface MonthBlockProps {
 
 function MonthBlock({ year, month, refreshKey, onDayClick }: MonthBlockProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const { moods, meditatedDays, loading } = useMonthMoods(year, month, refreshKey);
+  const { moods, meditatedDays, planDays, loading } = useMonthMoods(year, month, refreshKey);
   const now = new Date();
   const isCurrentMonth =
     year === now.getFullYear() && month === now.getMonth();
@@ -50,6 +60,7 @@ function MonthBlock({ year, month, refreshKey, onDayClick }: MonthBlockProps) {
           month={month}
           moods={moods}
           meditatedDays={meditatedDays}
+          planDays={planDays}
           onDayClick={onDayClick}
         />
       )}
@@ -67,16 +78,19 @@ function buildMonthList(centerYear: number, centerMonth: number, count: number) 
   return months;
 }
 
-export function InfiniteCalendar() {
+export function InfiniteCalendar({
+  onOpenDay,
+  refreshKey,
+  inboxOpen = false,
+  scheduleOpen = false,
+  onToggleInbox,
+  onToggleSchedule,
+}: InfiniteCalendarProps) {
   const { signOut } = useAuth();
   const now = new Date();
   const [months, setMonths] = useState(() =>
     buildMonthList(now.getFullYear(), now.getMonth(), 5)
   );
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [initialTab, setInitialTab] = useState<DayTab>("mood");
-  const [refreshKey, setRefreshKey] = useState(0);
   const headerRef = useRef<HTMLElement>(null);
   const topSentinel = useRef<HTMLDivElement>(null);
   const bottomSentinel = useRef<HTMLDivElement>(null);
@@ -189,9 +203,7 @@ export function InfiniteCalendar() {
   }, [loadPast, loadFuture]);
 
   const openDaySheet = (dateKey: string, tab: DayTab = "mood") => {
-    setSelectedDate(dateKey);
-    setInitialTab(tab);
-    setSheetOpen(true);
+    onOpenDay(dateKey, tab);
   };
 
   const handleDayClick = (dateKey: string) => {
@@ -200,39 +212,65 @@ export function InfiniteCalendar() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-lg pb-28">
+      <div className="mx-auto w-full max-w-lg pb-28 lg:max-w-none">
         <header
           ref={headerRef}
-          className="sticky top-0 z-10 border-b border-border/40 bg-background/75 px-5 py-5 backdrop-blur-xl"
+          className="sticky top-0 z-10 border-b border-border/40 bg-background/75 px-4 py-4 backdrop-blur-xl sm:px-5 sm:py-5"
         >
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-center text-xl font-medium tracking-tight text-foreground">
-              Mood
-            </h1>
+          <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-full px-3 text-[11px]"
-              onClick={() => scrollToToday("smooth")}
+              variant={inboxOpen ? "default" : "outline"}
+              size="icon"
+              className="h-8 w-8 shrink-0 rounded-full lg:hidden"
+              onClick={onToggleInbox}
+              aria-label={inboxOpen ? "Hide notes" : "Show notes"}
+              aria-pressed={inboxOpen}
             >
-              Today
+              <StickyNote className="h-3.5 w-3.5" />
             </Button>
-            <ThemeToggle />
+
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2">
+              <h1 className="text-center text-xl font-medium tracking-tight text-foreground">
+                Mood
+              </h1>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-full px-3 text-[11px]"
+                onClick={() => scrollToToday("smooth")}
+              >
+                Today
+              </Button>
+              <ThemeToggle />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-full px-2 text-[11px] text-muted-foreground"
+                onClick={() => void signOut()}
+              >
+                Sign out
+              </Button>
+            </div>
+
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 rounded-full px-2 text-[11px] text-muted-foreground"
-              onClick={() => void signOut()}
+              variant={scheduleOpen ? "default" : "outline"}
+              size="icon"
+              className={cn("h-8 w-8 shrink-0 rounded-full lg:hidden")}
+              onClick={onToggleSchedule}
+              aria-label={scheduleOpen ? "Hide schedule" : "Show schedule"}
+              aria-pressed={scheduleOpen}
             >
-              Sign out
+              <Calendar className="h-3.5 w-3.5" />
             </Button>
           </div>
           <p className="mt-0.5 text-center text-xs text-muted-foreground">
             Tap a day · scroll for more months
           </p>
-          <div className="mt-3 flex items-center justify-center gap-1.5">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
             {[1, 3, 5, 7, 10].map((s) => (
               <div
                 key={s}
@@ -270,19 +308,9 @@ export function InfiniteCalendar() {
         <div ref={bottomSentinel} className="h-1" />
       </div>
 
-      <TodayQuickActions onOpenDay={(tab) => openDaySheet(toDateKey(new Date()), tab)} />
-
-      {selectedDate && (
-        <DaySheet
-          dateKey={selectedDate}
-          open={sheetOpen}
-          initialTab={initialTab}
-          onOpenChange={(open) => {
-            setSheetOpen(open);
-            if (!open) setRefreshKey((k) => k + 1);
-          }}
-        />
-      )}
+      <TodayQuickActions
+        onOpenDay={(tab) => openDaySheet(toDateKey(new Date()), tab)}
+      />
     </>
   );
 }

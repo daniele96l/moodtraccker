@@ -11,12 +11,13 @@ import {
   type ReactNode,
 } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import type { User } from "firebase/auth";
 import { useAuth } from "@/lib/auth-context";
 import { getFirebaseDb } from "@/lib/firebase";
 import {
   clearSessionKey,
-  deriveEncryptionKey,
   decryptPayload,
+  deriveAccountEncryptionKey,
   encryptPayload,
   generateSaltB64,
   loadSessionKey,
@@ -28,29 +29,53 @@ import { setStoreUser } from "@/lib/firestore-store";
 interface EncryptionContextValue {
   unlocked: boolean;
   loading: boolean;
-  needsSetup: boolean | null;
   error: string | null;
-  setupPassphrase: (passphrase: string, confirm: string) => Promise<void>;
-  unlockPassphrase: (passphrase: string) => Promise<void>;
   lock: () => void;
 }
 
 const EncryptionContext = createContext<EncryptionContextValue | null>(null);
 
+async function verifyProbe(probe: unknown) {
+  if (probe) {
+    await decryptPayload<{ ok: boolean }>(
+      probe as { _enc?: string; iv?: string; ct?: string }
+    );
+  }
+}
+
+async function unlockWithKey(user: User, key: CryptoKey) {
+  setActiveEncryptionKey(key);
+  await saveSessionKey(user.uid, key);
+  setStoreUser(user.uid);
+}
+
+async function tryUnlockWithKey(
+  user: User,
+  key: CryptoKey,
+  probe: unknown
+): Promise<boolean> {
+  setActiveEncryptionKey(key);
+  try {
+    await verifyProbe(probe);
+    await unlockWithKey(user, key);
+    return true;
+  } catch {
+    setActiveEncryptionKey(null);
+    setStoreUser(null);
+    return false;
+  }
+}
+
 export function EncryptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [unlocked, setUnlocked] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saltB64, setSaltB64] = useState<string | null>(null);
   const lastUidRef = useRef<string | null>(null);
 
   const reset = useCallback(() => {
     if (lastUidRef.current) clearSessionKey(lastUidRef.current);
     setUnlocked(false);
-    setNeedsSetup(null);
-    setSaltB64(null);
     setError(null);
     setActiveEncryptionKey(null);
     setStoreUser(null);
@@ -63,132 +88,105 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
     }
     reset();
   }, [user, reset]);
+
   useEffect(() => {
     if (!user) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     (async () => {
-      const snap = await getDoc(
-        doc(getFirebaseDb(), "users", user.uid, "meta", "encryption")
-      );
-      if (cancelled) return;
+      setLoading(true);
+      setError(null);
+      setUnlocked(false);
+      setActiveEncryptionKey(null);
+      setStoreUser(null);
 
-      const hasSalt = snap.exists() && snap.data()?.salt;
-      if (hasSalt) {
-        const salt = snap.data()!.salt as string;
-        setSaltB64(salt);
-        setNeedsSetup(false);
+      try {
+        const encRef = doc(
+          getFirebaseDb(),
+          "users",
+          user.uid,
+          "meta",
+          "encryption"
+        );
+        const snap = await getDoc(encRef);
+        if (cancelled) return;
+
+        const data = snap.exists() ? snap.data() : null;
+        const salt = data?.salt as string | undefined;
+        const probe = data?.probe;
+        const accountBound = !!data?.accountBound;
 
         const sessionKey = await loadSessionKey(user.uid);
-        if (sessionKey) {
-          setActiveEncryptionKey(sessionKey);
-          try {
-            const probe = snap.data()?.probe;
-            if (probe) {
-              await decryptPayload<{ ok: boolean }>(probe);
-            }
-            setStoreUser(user.uid);
+
+        if (sessionKey && (await tryUnlockWithKey(user, sessionKey, probe))) {
+          if (!cancelled) {
             setUnlocked(true);
             setLoading(false);
+          }
+          return;
+        }
+
+        if (salt && !accountBound && sessionKey) {
+          await unlockWithKey(user, sessionKey);
+          if (!cancelled) {
+            setUnlocked(true);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (sessionKey) clearSessionKey(user.uid);
+
+        if (salt) {
+          const accountKey = await deriveAccountEncryptionKey(user.uid, salt);
+          if (await tryUnlockWithKey(user, accountKey, probe)) {
+            if (!cancelled) {
+              setUnlocked(true);
+              setLoading(false);
+            }
             return;
-          } catch {
-            clearSessionKey(user.uid);
-            setActiveEncryptionKey(null);
           }
         }
-      } else {
-        setNeedsSetup(true);
+
+        if (!salt) {
+          const newSalt = generateSaltB64();
+          const newKey = await deriveAccountEncryptionKey(user.uid, newSalt);
+          setActiveEncryptionKey(newKey);
+          const newProbe = await encryptPayload({ ok: true });
+          await setDoc(encRef, {
+            salt: newSalt,
+            version: 2,
+            accountBound: true,
+            created_at: new Date().toISOString(),
+            probe: newProbe,
+          });
+          await unlockWithKey(user, newKey);
+          if (!cancelled) {
+            setUnlocked(true);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setError(
+            "Could not unlock your data. Sign in on a device where you were already signed in, or contact support."
+          );
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Could not set up encryption for your account.");
+          setLoading(false);
+        }
       }
-      setLoading(false);
-    })().catch(() => {
-      if (!cancelled) {
-        setError("Could not load encryption settings.");
-        setLoading(false);
-      }
-    });
+    })();
 
     return () => {
       cancelled = true;
     };
   }, [user]);
-
-  const setupPassphrase = useCallback(
-    async (passphrase: string, confirm: string) => {
-      if (!user) return;
-      if (passphrase.length < 8) {
-        setError("Passphrase must be at least 8 characters.");
-        return;
-      }
-      if (passphrase !== confirm) {
-        setError("Passphrases do not match.");
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-      try {
-        const salt = generateSaltB64();
-        const key = await deriveEncryptionKey(passphrase, salt);
-        setActiveEncryptionKey(key);
-        const probe = await encryptPayload({ ok: true });
-        await setDoc(doc(getFirebaseDb(), "users", user.uid, "meta", "encryption"), {
-          salt,
-          version: 1,
-          created_at: new Date().toISOString(),
-          probe,
-        });
-        setSaltB64(salt);
-        setStoreUser(user.uid);
-        setUnlocked(true);
-        setNeedsSetup(false);
-        setError(null);
-        await saveSessionKey(user.uid, key);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Setup failed");
-        setActiveEncryptionKey(null);
-        setStoreUser(null);
-        setUnlocked(false);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user]
-  );
-
-  const unlockPassphrase = useCallback(
-    async (passphrase: string) => {
-      if (!user || !saltB64) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const key = await deriveEncryptionKey(passphrase, saltB64);
-        setActiveEncryptionKey(key);
-        const snap = await getDoc(
-          doc(getFirebaseDb(), "users", user.uid, "meta", "encryption")
-        );
-        const probe = snap.data()?.probe;
-        if (probe) {
-          await decryptPayload<{ ok: boolean }>(probe);
-        }
-        setStoreUser(user.uid);
-        setUnlocked(true);
-        setError(null);
-        await saveSessionKey(user.uid, key);
-      } catch {
-        setError("Wrong passphrase. Your data stays locked.");
-        setActiveEncryptionKey(null);
-        setStoreUser(null);
-        setUnlocked(false);
-        if (user) clearSessionKey(user.uid);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user, saltB64]
-  );
 
   const lock = useCallback(() => {
     if (lastUidRef.current) clearSessionKey(lastUidRef.current);
@@ -201,21 +199,10 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
     () => ({
       unlocked,
       loading,
-      needsSetup,
       error,
-      setupPassphrase,
-      unlockPassphrase,
       lock,
     }),
-    [
-      unlocked,
-      loading,
-      needsSetup,
-      error,
-      setupPassphrase,
-      unlockPassphrase,
-      lock,
-    ]
+    [unlocked, loading, error, lock]
   );
 
   return (

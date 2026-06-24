@@ -5,6 +5,7 @@ import {
   decryptPayload,
   encryptPayload,
   isEncryptedDoc,
+  tryDecryptPayload,
 } from "@/lib/encryption";
 import type {
   DayEntry,
@@ -38,11 +39,22 @@ export async function unpackDayEntry(
 ): Promise<DayEntry> {
   const now = new Date().toISOString();
   if (isEncryptedDoc(data)) {
-    const payload = await decryptPayload<{
+    const payload = await tryDecryptPayload<{
       mood_score: number | null;
       journal_text: string | null;
       todos?: DayEntry["todos"];
     }>(data);
+    if (!payload) {
+      return {
+        id: dateKey,
+        entry_date: dateKey,
+        mood_score: null,
+        journal_text: null,
+        todos: [],
+        created_at: (data.created_at as string) ?? now,
+        updated_at: (data.updated_at as string) ?? now,
+      };
+    }
     return {
       id: dateKey,
       entry_date: dateKey,
@@ -79,7 +91,19 @@ export async function packHabit(habit: Habit): Promise<DocumentData> {
 
 export async function unpackHabit(id: string, data: DocumentData): Promise<Habit> {
   if (isEncryptedDoc(data)) {
-    return { id, ...(await decryptPayload<Omit<Habit, "id">>(data)) };
+    const payload = await tryDecryptPayload<Omit<Habit, "id">>(data);
+    if (!payload) {
+      return {
+        id,
+        name: "Unavailable",
+        kind: "habit",
+        color: null,
+        sort_order: 0,
+        archived_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+    }
+    return { id, ...payload };
   }
 
   return {
@@ -107,7 +131,16 @@ export async function unpackHabitLog(
   data: DocumentData
 ): Promise<HabitLog> {
   if (isEncryptedDoc(data)) {
-    return { id, ...(await decryptPayload<Omit<HabitLog, "id">>(data)) };
+    const payload = await tryDecryptPayload<Omit<HabitLog, "id">>(data);
+    if (!payload) {
+      return {
+        id,
+        habit_id: "",
+        log_date: "",
+        completed: false,
+      };
+    }
+    return { id, ...payload };
   }
 
   return {
@@ -127,17 +160,43 @@ export async function packMeditationSession(
     pattern: session.pattern,
     completed_at: session.completed_at,
   });
-  return encrypted;
+  return {
+    ...encrypted,
+    session_date: session.session_date,
+    duration_seconds: session.duration_seconds,
+    completed_at: session.completed_at,
+  };
 }
 
 export async function unpackMeditationSession(
   id: string,
   data: DocumentData
 ): Promise<MeditationSession> {
+  const now = new Date().toISOString();
+  const plainDate =
+    typeof data.session_date === "string" ? data.session_date : "";
+  const plainDuration =
+    typeof data.duration_seconds === "number" ? data.duration_seconds : 0;
+  const plainCompleted =
+    typeof data.completed_at === "string" ? data.completed_at : now;
+
   if (isEncryptedDoc(data)) {
+    const payload = await tryDecryptPayload<Omit<MeditationSession, "id">>(data);
+    if (!payload) {
+      return {
+        id,
+        session_date: plainDate,
+        duration_seconds: plainDuration,
+        pattern: null,
+        completed_at: plainCompleted,
+      };
+    }
     return {
       id,
-      ...(await decryptPayload<Omit<MeditationSession, "id">>(data)),
+      ...payload,
+      session_date: payload.session_date || plainDate,
+      duration_seconds: payload.duration_seconds || plainDuration,
+      completed_at: payload.completed_at || plainCompleted,
     };
   }
 
@@ -187,11 +246,14 @@ function migrateLegacyInbox(payload: {
 export async function unpackGlobalInbox(data: DocumentData): Promise<GlobalInbox> {
   const now = new Date().toISOString();
   if (isEncryptedDoc(data)) {
-    const payload = await decryptPayload<{
+    const payload = await tryDecryptPayload<{
       note?: string | null;
       notes?: GlobalInbox["notes"];
       todos: GlobalInbox["todos"];
     }>(data);
+    if (!payload) {
+      return { notes: [], todos: [], updated_at: now };
+    }
     const migrated = migrateLegacyInbox(payload);
     return {
       ...migrated,

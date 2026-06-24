@@ -25,15 +25,6 @@ export function useDayTodos(dateKey: string) {
     [todos, saveTodos]
   );
 
-  const toggleTodo = useCallback(
-    (id: string) => {
-      saveTodos(
-        todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-      );
-    },
-    [todos, saveTodos]
-  );
-
   const removeTodo = useCallback(
     (id: string) => {
       saveTodos(todos.filter((t) => t.id !== id));
@@ -67,7 +58,6 @@ export function useDayTodos(dateKey: string) {
     todos,
     loading,
     addTodo,
-    toggleTodo,
     removeTodo,
     updateTodo,
   };

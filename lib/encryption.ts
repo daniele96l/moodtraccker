@@ -18,6 +18,13 @@ export function generateSaltB64(): string {
   return bytesToB64(salt);
 }
 
+export async function deriveAccountEncryptionKey(
+  uid: string,
+  saltB64: string
+): Promise<CryptoKey> {
+  return deriveEncryptionKey(uid, saltB64);
+}
+
 export async function deriveEncryptionKey(
   passphrase: string,
   saltB64: string
@@ -108,18 +115,33 @@ export async function decryptPayload<T>(data: {
   iv?: string;
   ct?: string;
 }): Promise<T> {
+  const result = await tryDecryptPayload<T>(data);
+  if (result === null) {
+    throw new Error("Decryption failed");
+  }
+  return result;
+}
+
+export async function tryDecryptPayload<T>(data: {
+  _enc?: string;
+  iv?: string;
+  ct?: string;
+}): Promise<T | null> {
   if (!activeKey) throw new Error("Encryption not unlocked");
   if (!isEncryptedDoc(data)) {
-    throw new Error("Document is not encrypted");
+    return null;
   }
 
-  const plaintext = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: b64ToBytes(data.iv!) as BufferSource },
-    activeKey,
-    b64ToBytes(data.ct!) as BufferSource
-  );
-
-  return JSON.parse(new TextDecoder().decode(plaintext)) as T;
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: b64ToBytes(data.iv!) as BufferSource },
+      activeKey,
+      b64ToBytes(data.ct!) as BufferSource
+    );
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T;
+  } catch {
+    return null;
+  }
 }
 
 function bytesToB64(bytes: Uint8Array): string {

@@ -123,8 +123,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             Mood Tracker
           </h1>
           <p className="mb-6 text-center text-sm text-muted-foreground">
-            Sign in with Google, then unlock with your private passphrase.
-            Journal and habits are encrypted before they reach the cloud.
+            Sign in with Google. Your journal and habits are encrypted and tied
+            to your account.
           </p>
 
           {error === "oauth_setup" ? (

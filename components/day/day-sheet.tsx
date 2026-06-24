@@ -40,7 +40,6 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
     todos,
     loading: calendarLoading,
     addTodo,
-    toggleTodo,
     removeTodo,
     updateTodo,
   } = useDayTodos(dateKey);
@@ -213,7 +212,6 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
                   todos={todos}
                   loading={calendarLoading}
                   onAdd={addTodo}
-                  onToggle={toggleTodo}
                   onRemove={removeTodo}
                   onUpdate={updateTodo}
                 />
