@@ -136,4 +136,11 @@
   html {
     @apply font-sans;
   }
+
+  @media (max-width: 1023px) {
+    html,
+    body {
+      touch-action: manipulation;
+    }
+  }
 }

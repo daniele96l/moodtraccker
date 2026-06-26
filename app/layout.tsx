@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { EncryptionProvider } from "@/lib/encryption-context";
@@ -14,6 +14,13 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Mood Tracker",
   description: "Track your mood, habits, journal, and meditation",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const themeScript = `
