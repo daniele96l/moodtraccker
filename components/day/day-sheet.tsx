@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Flower2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import {
   Dialog,
@@ -21,7 +23,9 @@ import { moodColor } from "@/lib/mood-colors";
 import { useTheme } from "@/lib/hooks/use-theme";
 import {
   getMeditationSessions,
+  isMeditationDone,
   subscribeStore,
+  toggleMeditationDone,
 } from "@/lib/firestore-store";
 import type { MeditationSession } from "@/lib/types";
 import type { DayTab } from "@/lib/types";
@@ -55,6 +59,7 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
   } = useHabits(dateKey);
   const [mood, setMood] = useState(5);
   const [sessions, setSessions] = useState<MeditationSession[]>([]);
+  const [meditationDone, setMeditationDone] = useState(false);
   const [tab, setTab] = useState<DayTab>(initialTab);
 
   useEffect(() => {
@@ -75,6 +80,7 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
 
   const fetchSessions = useCallback(() => {
     setSessions(getMeditationSessions(dateKey));
+    setMeditationDone(isMeditationDone(dateKey));
   }, [dateKey]);
 
   useEffect(() => {
@@ -184,6 +190,27 @@ export function DaySheet({ dateKey, open, onOpenChange, initialTab = "mood" }: D
                 value="meditate"
                 className="mt-0 space-y-4 outline-none"
               >
+                <button
+                  type="button"
+                  onClick={() => void toggleMeditationDone(dateKey)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-all active:scale-[0.99]",
+                    meditationDone
+                      ? "border-primary/30 bg-primary/10"
+                      : "border-border/50 bg-muted/30 hover:border-primary/30"
+                  )}
+                >
+                  <span className="text-sm font-medium">Meditated this day</span>
+                  <span
+                    className={cn(
+                      "flex items-center gap-1 text-xs",
+                      meditationDone ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    {meditationDone && <Flower2 className="h-3.5 w-3.5" />}
+                    {meditationDone ? "Done" : "Tap to mark"}
+                  </span>
+                </button>
                 <MeditationTimer dateKey={dateKey} onComplete={fetchSessions} />
                 {sessions.length > 0 && (
                   <div className="space-y-2">

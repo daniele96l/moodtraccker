@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, MapPin, Plus, X } from "lucide-react";
+import { Calendar, Plus, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { PlanAddForm } from "@/components/day/plan-add-form";
+import { PlanRow } from "@/components/day/plan-row";
 import { Button } from "@/components/ui/button";
 import { toDateKey } from "@/lib/date-utils";
+import {
+  removeDayPlanItem,
+  updateDayPlanItem,
+} from "@/lib/firestore-store";
 import { useDayTodos } from "@/lib/hooks/use-day-todos";
 import { useUpcomingPlans } from "@/lib/hooks/use-upcoming-plans";
-import { formatPlanTime } from "@/lib/plan-utils";
 import type { DayTab } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -112,26 +116,17 @@ export function DesktopScheduleSidebar({
                 >
                   {format(parseISO(dateKey), "EEE, MMM d")}
                 </button>
-                <ul className="space-y-2">
+                <ul className="relative space-y-0 border-l border-primary/20 pl-3">
                   {grouped[dateKey].map(({ todo }) => (
-                    <li key={todo.id}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenDay(dateKey, "calendar")}
-                        className="w-full rounded-2xl border border-border/60 bg-card/90 px-3 py-2.5 text-left transition-colors hover:border-primary/25"
-                      >
-                        <p className="text-[11px] font-medium tabular-nums text-primary">
-                          {formatPlanTime(todo.time)}
-                        </p>
-                        <p className="text-sm font-medium">{todo.text}</p>
-                        {todo.location && (
-                          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{todo.location}</span>
-                          </p>
-                        )}
-                      </button>
-                    </li>
+                    <PlanRow
+                      key={todo.id}
+                      todo={todo}
+                      className="mb-2"
+                      onUpdate={(patch) =>
+                        void updateDayPlanItem(dateKey, todo.id, patch)
+                      }
+                      onRemove={() => void removeDayPlanItem(dateKey, todo.id)}
+                    />
                   ))}
                 </ul>
               </section>

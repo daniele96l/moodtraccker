@@ -33,7 +33,7 @@ import type {
   MeditationSession,
 } from "@/lib/types";
 import type { MoodStore } from "@/lib/local-store";
-import { normalizePlanItem, planPreview, sortPlanItems } from "@/lib/plan-utils";
+import { normalizePlanItem, planPreview, sortPlanItems, type PlanItemInput } from "@/lib/plan-utils";
 import { toDateKey } from "@/lib/date-utils";
 
 const CHANGE_EVENT = "moodtracker:change";
@@ -177,7 +177,9 @@ export function getDayEntry(dateKey: string): DayEntry | null {
 
 export async function upsertDayEntry(
   dateKey: string,
-  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text" | "todos">>
+  patch: Partial<
+    Pick<DayEntry, "mood_score" | "journal_text" | "meditation_done" | "todos">
+  >
 ): Promise<DayEntry> {
   const uid = requireUid();
   const now = new Date().toISOString();
@@ -193,6 +195,10 @@ export async function upsertDayEntry(
       patch.journal_text !== undefined
         ? patch.journal_text
         : (existing?.journal_text ?? null),
+    meditation_done:
+      patch.meditation_done !== undefined
+        ? patch.meditation_done
+        : (existing?.meditation_done ?? null),
     todos:
       patch.todos !== undefined ? patch.todos : (existing?.todos ?? []),
     created_at: existing?.created_at ?? now,
@@ -213,6 +219,49 @@ export async function upsertDayEntry(
   );
 
   return entry;
+}
+
+function patchDayPlanTodos(
+  dateKey: string,
+  updater: (todos: DayTodo[]) => DayTodo[]
+): DayTodo[] {
+  const existing = getDayEntry(dateKey);
+  const todos = (existing?.todos ?? []).map(normalizePlanItem);
+  return updater(todos);
+}
+
+export async function updateDayPlanItem(
+  dateKey: string,
+  id: string,
+  patch: Partial<PlanItemInput>
+): Promise<DayEntry> {
+  const next = patchDayPlanTodos(dateKey, (todos) =>
+    todos.map((t) =>
+      t.id === id
+        ? {
+            ...t,
+            ...patch,
+            text: patch.text?.trim() || t.text,
+            time: patch.time !== undefined ? patch.time || null : t.time,
+            location:
+              patch.location !== undefined
+                ? patch.location?.trim() || null
+                : t.location,
+          }
+        : t
+    )
+  );
+  return upsertDayEntry(dateKey, { todos: next });
+}
+
+export async function removeDayPlanItem(
+  dateKey: string,
+  id: string
+): Promise<DayEntry> {
+  const next = patchDayPlanTodos(dateKey, (todos) =>
+    todos.filter((t) => t.id !== id)
+  );
+  return upsertDayEntry(dateKey, { todos: next });
 }
 
 export function getMonthMoods(
@@ -250,11 +299,26 @@ export function getMonthMeditationDays(
   const lastDay = new Date(year, month + 1, 0).getDate();
   const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const map: Record<string, boolean> = {};
+  const candidateDays = new Set<string>();
   cache.meditation_sessions.forEach((s) => {
     const dateKey = meditationSessionDate(s);
-    if (!dateKey || dateKey < start || dateKey > end) return;
-    map[dateKey] = true;
+    if (dateKey && dateKey >= start && dateKey <= end) {
+      candidateDays.add(dateKey);
+    }
+  });
+  cache.day_entries.forEach((e) => {
+    if (
+      e.entry_date >= start &&
+      e.entry_date <= end &&
+      e.meditation_done != null
+    ) {
+      candidateDays.add(e.entry_date);
+    }
+  });
+
+  const map: Record<string, boolean> = {};
+  candidateDays.forEach((dateKey) => {
+    if (isMeditationDone(dateKey)) map[dateKey] = true;
   });
   return map;
 }
@@ -502,6 +566,18 @@ export function getMeditationSessions(dateKey: string): MeditationSession[] {
     );
 }
 
+export function isMeditationDone(dateKey: string): boolean {
+  const entry = getDayEntry(dateKey);
+  if (entry?.meditation_done != null) return entry.meditation_done;
+  return getMeditationSessions(dateKey).length > 0;
+}
+
+export async function toggleMeditationDone(dateKey: string): Promise<boolean> {
+  const next = !isMeditationDone(dateKey);
+  await upsertDayEntry(dateKey, { meditation_done: next });
+  return next;
+}
+
 export async function addMeditationSession(
   dateKey: string,
   durationSeconds: number,
@@ -523,6 +599,10 @@ export async function addMeditationSession(
     doc(getFirebaseDb(), "users", uid, "meditation_sessions", session.id),
     await packMeditationSession(session)
   );
+
+  if (durationSeconds >= 10) {
+    await upsertDayEntry(dateKey, { meditation_done: true });
+  }
 
   return session;
 }

@@ -3,6 +3,10 @@
 import { useCallback } from "react";
 import { useDayEntry } from "@/lib/hooks/use-day-entry";
 import { createPlanItem, normalizePlanItem } from "@/lib/plan-utils";
+import {
+  removeDayPlanItem,
+  updateDayPlanItem,
+} from "@/lib/firestore-store";
 import type { DayTodo } from "@/lib/types";
 import type { PlanItemInput } from "@/lib/plan-utils";
 
@@ -27,31 +31,16 @@ export function useDayTodos(dateKey: string) {
 
   const removeTodo = useCallback(
     (id: string) => {
-      saveTodos(todos.filter((t) => t.id !== id));
+      void removeDayPlanItem(dateKey, id);
     },
-    [todos, saveTodos]
+    [dateKey]
   );
 
   const updateTodo = useCallback(
     (id: string, patch: Partial<PlanItemInput>) => {
-      saveTodos(
-        todos.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                ...patch,
-                text: patch.text?.trim() || t.text,
-                time: patch.time !== undefined ? patch.time || null : t.time,
-                location:
-                  patch.location !== undefined
-                    ? patch.location?.trim() || null
-                    : t.location,
-              }
-            : t
-        )
-      );
+      void updateDayPlanItem(dateKey, id, patch);
     },
-    [todos, saveTodos]
+    [dateKey]
   );
 
   return {

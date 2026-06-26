@@ -23,6 +23,8 @@ export interface DayEntry {
   entry_date: string;
   mood_score: number | null;
   journal_text: string | null;
+  /** Explicit override; null means infer from timer sessions. */
+  meditation_done: boolean | null;
   todos: DayTodo[];
   created_at: string;
   updated_at: string;

@@ -19,7 +19,7 @@ export function useDayEntry(dateKey: string) {
   }, [fetchEntry]);
 
   const upsert = useCallback(
-    (patch: Partial<Pick<DayEntry, "mood_score" | "journal_text" | "todos">>) => {
+    (patch: Partial<Pick<DayEntry, "mood_score" | "journal_text" | "meditation_done" | "todos">>) => {
       void upsertDayEntry(dateKey, patch).then(setEntry);
     },
     [dateKey]

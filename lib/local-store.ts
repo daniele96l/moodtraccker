@@ -57,7 +57,9 @@ export function getDayEntry(dateKey: string): DayEntry | null {
 
 export function upsertDayEntry(
   dateKey: string,
-  patch: Partial<Pick<DayEntry, "mood_score" | "journal_text" | "todos">>
+  patch: Partial<
+    Pick<DayEntry, "mood_score" | "journal_text" | "meditation_done" | "todos">
+  >
 ): DayEntry {
   const store = loadRaw();
   const now = new Date().toISOString();
@@ -78,6 +80,7 @@ export function upsertDayEntry(
     entry_date: dateKey,
     mood_score: patch.mood_score ?? null,
     journal_text: patch.journal_text ?? null,
+    meditation_done: patch.meditation_done ?? null,
     todos: patch.todos ?? [],
     created_at: now,
     updated_at: now,
@@ -112,11 +115,25 @@ export function getMonthMeditationDays(
   const lastDay = new Date(year, month + 1, 0).getDate();
   const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const map: Record<string, boolean> = {};
+  const candidateDays = new Set<string>();
   loadRaw().meditation_sessions.forEach((s) => {
     if (s.session_date >= start && s.session_date <= end) {
-      map[s.session_date] = true;
+      candidateDays.add(s.session_date);
     }
+  });
+  loadRaw().day_entries.forEach((e) => {
+    if (
+      e.entry_date >= start &&
+      e.entry_date <= end &&
+      e.meditation_done != null
+    ) {
+      candidateDays.add(e.entry_date);
+    }
+  });
+
+  const map: Record<string, boolean> = {};
+  candidateDays.forEach((dateKey) => {
+    if (isMeditationDone(dateKey)) map[dateKey] = true;
   });
   return map;
 }
@@ -265,11 +282,25 @@ export function getHabitLogs(habitId: string) {
 
 export function getMeditationSessions(dateKey: string): MeditationSession[] {
   return loadRaw()
-    .meditation_sessions.filter((s) => s.session_date === dateKey)
+    .meditation_sessions.filter(
+      (s) => s.session_date === dateKey && s.duration_seconds >= 10
+    )
     .sort(
       (a, b) =>
         new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
     );
+}
+
+export function isMeditationDone(dateKey: string): boolean {
+  const entry = getDayEntry(dateKey);
+  if (entry?.meditation_done != null) return entry.meditation_done;
+  return getMeditationSessions(dateKey).length > 0;
+}
+
+export function toggleMeditationDone(dateKey: string): boolean {
+  const next = !isMeditationDone(dateKey);
+  upsertDayEntry(dateKey, { meditation_done: next });
+  return next;
 }
 
 export function addMeditationSession(
@@ -287,5 +318,8 @@ export function addMeditationSession(
   };
   store.meditation_sessions.push(session);
   saveRaw(store);
+  if (durationSeconds >= 10) {
+    upsertDayEntry(dateKey, { meditation_done: true });
+  }
   return session;
 }

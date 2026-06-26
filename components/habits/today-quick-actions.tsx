@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { BookOpen, Check, Flower2, ShieldCheck, Smile } from "lucide-react";
-import { FooterNotes } from "@/components/global/footer-notes";
 import { useHabits } from "@/lib/hooks/use-habits";
 import { useDayEntry } from "@/lib/hooks/use-day-entry";
 import { habitDisplayLabel } from "@/lib/habit-utils";
 import {
   getDayEntry,
   getMeditationSessions,
+  isMeditationDone,
   subscribeStore,
+  toggleMeditationDone,
 } from "@/lib/firestore-store";
 import { moodColor, MOOD_LABELS } from "@/lib/mood-colors";
 import { useTheme } from "@/lib/hooks/use-theme";
@@ -30,7 +31,8 @@ export function TodayQuickActions({ onOpenDay, className }: TodayQuickActionsPro
   const { entry, upsert } = useDayEntry(today);
   const { habits, logs, loading, toggleHabit } = useHabits(today);
   const [hasJournal, setHasJournal] = useState(false);
-  const [meditationCount, setMeditationCount] = useState(0);
+  const [meditationDone, setMeditationDone] = useState(false);
+  const [sessionCount, setSessionCount] = useState(0);
   const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
   const moodScore = entry?.mood_score ?? null;
@@ -39,7 +41,8 @@ export function TodayQuickActions({ onOpenDay, className }: TodayQuickActionsPro
     const refresh = () => {
       const entry = getDayEntry(today);
       setHasJournal(!!entry?.journal_text?.trim());
-      setMeditationCount(getMeditationSessions(today).length);
+      setMeditationDone(isMeditationDone(today));
+      setSessionCount(getMeditationSessions(today).length);
     };
     refresh();
     return subscribeStore(refresh);
@@ -138,10 +141,6 @@ export function TodayQuickActions({ onOpenDay, className }: TodayQuickActionsPro
       )}
 
       <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="lg:hidden">
-          <FooterNotes />
-        </div>
-
         <button
           type="button"
           onClick={() => setMoodPickerOpen((v) => !v)}
@@ -170,22 +169,24 @@ export function TodayQuickActions({ onOpenDay, className }: TodayQuickActionsPro
 
         <button
           type="button"
-          onClick={() => onOpenDay("meditate")}
+          onClick={() => void toggleMeditationDone(today)}
           className={cn(
             "shrink-0 rounded-full border px-3 py-1.5 text-left transition-all active:scale-95",
-            meditationCount > 0
+            meditationDone
               ? "border-primary/30 bg-primary/10 text-foreground"
               : "border-border/60 bg-card/90 text-muted-foreground hover:border-primary/30"
           )}
         >
           <span className="flex items-center gap-1.5 text-xs font-medium">
-            {meditationCount > 0 && <Flower2 className="h-3 w-3 text-primary" />}
+            {meditationDone && <Flower2 className="h-3 w-3 text-primary" />}
             Meditate
           </span>
           <span className="block text-[10px] opacity-70">
-            {meditationCount > 0
-              ? `${meditationCount} session${meditationCount > 1 ? "s" : ""}`
-              : "Start today"}
+            {meditationDone
+              ? sessionCount > 0
+                ? `${sessionCount} session${sessionCount > 1 ? "s" : ""}`
+                : "Done today"
+              : "Mark done"}
           </span>
         </button>
 

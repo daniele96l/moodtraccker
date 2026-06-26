@@ -18,12 +18,18 @@ import type {
 export async function packDayEntry(
   entry: Pick<
     DayEntry,
-    "mood_score" | "journal_text" | "todos" | "created_at" | "updated_at"
+    | "mood_score"
+    | "journal_text"
+    | "meditation_done"
+    | "todos"
+    | "created_at"
+    | "updated_at"
   >
 ): Promise<DocumentData> {
   const encrypted = await encryptPayload({
     mood_score: entry.mood_score,
     journal_text: entry.journal_text,
+    meditation_done: entry.meditation_done,
     todos: entry.todos,
   });
   return {
@@ -42,6 +48,7 @@ export async function unpackDayEntry(
     const payload = await tryDecryptPayload<{
       mood_score: number | null;
       journal_text: string | null;
+      meditation_done?: boolean | null;
       todos?: DayEntry["todos"];
     }>(data);
     if (!payload) {
@@ -50,6 +57,7 @@ export async function unpackDayEntry(
         entry_date: dateKey,
         mood_score: null,
         journal_text: null,
+        meditation_done: null,
         todos: [],
         created_at: (data.created_at as string) ?? now,
         updated_at: (data.updated_at as string) ?? now,
@@ -60,6 +68,7 @@ export async function unpackDayEntry(
       entry_date: dateKey,
       mood_score: payload.mood_score,
       journal_text: payload.journal_text,
+      meditation_done: payload.meditation_done ?? null,
       todos: payload.todos ?? [],
       created_at: (data.created_at as string) ?? now,
       updated_at: (data.updated_at as string) ?? now,
@@ -71,6 +80,7 @@ export async function unpackDayEntry(
     entry_date: dateKey,
     mood_score: data.mood_score ?? null,
     journal_text: data.journal_text ?? null,
+    meditation_done: data.meditation_done ?? null,
     todos: data.todos ?? [],
     created_at: (data.created_at as string) ?? now,
     updated_at: (data.updated_at as string) ?? now,
